@@ -19,7 +19,9 @@ describe('#homeController', () => {
       url: '/'
     })
 
-    expect(result).toEqual(expect.stringContaining('Home |'))
+    expect(result).toEqual(
+      expect.stringContaining('Import fish and fishery products |')
+    )
     expect(statusCode).toBe(statusCodes.ok)
   })
 })
