@@ -1,15 +1,49 @@
 {% extends 'layouts/page.njk' %}
 
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+
 {% block content %}
   {{ appHeading({
     text: heading,
-    caption: "trade-imports-fish-importer-fe"
+    caption: "Fish importer"
   }) }}
 
   <div class="govuk-grid-row">
     <div class="govuk-grid-column-two-thirds">
       <div class="govuk-body" data-testid="app-page-body">
-        <p></p>
+        <p class="govuk-body-l">
+          Use this service to tell us about fish and fishery products you are importing into Great Britain.
+        </p>
+
+        <p>You can use this service to:</p>
+        <ul class="govuk-list govuk-list--bullet">
+          <li>create a new import notification</li>
+          <li>add details of the catch, species and commodity codes</li>
+          <li>upload catch certificates and supporting documents</li>
+          <li>check the status of your submitted imports</li>
+        </ul>
+
+        {{ govukInsetText({
+          text: "You must notify us before your consignment arrives at the border control post."
+        }) }}
+
+        {{ govukButton({
+          text: "Create a new import notification",
+          href: "#",
+          isStartButton: true
+        }) }}
+
+        <h2 class="govuk-heading-m">Your imports</h2>
+        <p data-testid="app-no-imports">You have not created any import notifications yet.</p>
+
+        <h2 class="govuk-heading-m">Before you start</h2>
+        <p>You will need:</p>
+        <ul class="govuk-list govuk-list--bullet">
+          <li>the catch certificate for the consignment</li>
+          <li>the commodity code and species of the fish</li>
+          <li>the expected arrival date and border control post</li>
+        </ul>
       </div>
     </div>
   </div>

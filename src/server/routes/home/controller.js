@@ -5,8 +5,8 @@
 export const homeController = {
   handler(_request, h) {
     return h.view('home/index', {
-      pageTitle: 'Home',
-      heading: 'Home'
+      pageTitle: 'Import fish and fishery products',
+      heading: 'Import fish and fishery products'
     })
   }
 }
