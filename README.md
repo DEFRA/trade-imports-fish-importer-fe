@@ -21,6 +21,7 @@ Core delivery platform Node.js Frontend Template.
 - [Docker](#docker)
   - [Development image](#development-image)
   - [Production image](#production-image)
+  - [Publishing](#publishing)
   - [Docker Compose](#docker-compose)
   - [Dependabot](#dependabot)
   - [SonarCloud](#sonarcloud)
@@ -168,6 +169,26 @@ Run:
 ```bash
 docker run -p 3000:3000 trade-imports-fish-importer-fe
 ```
+
+### Publishing
+
+The [Publish workflow](.github/workflows/publish.yml) keeps normal releases from `main`, including public Docker Hub
+publication. It also publishes prereleases from these branch forms:
+
+- `feature/FISB-1234` or `feature/FISB-1234-upload-documents`
+- `bugfix/FISB-1234` or `bugfix/FISB-1234-fix-upload`
+- `ci/FISB-1234` or `ci/FISB-1234-build-image`
+
+Jira ticket numbers may contain any number of digits. Optional descriptions must use lowercase letters and numbers,
+separated by single hyphens. Invalid names under these prefixes fail validation before publishing; other non-main
+branch prefixes do not trigger this workflow.
+
+The CDP build action uses only the lowercased Jira ticket as the prerelease suffix: for example, `fisb-1234`.
+It manages version increments automatically, producing versions such as `1.6.0-fisb-1234.0` and `1.6.0-fisb-1234.1`.
+Branches with the same Jira ticket share this suffix, regardless of branch prefix or description.
+
+Prerelease images are published to ECR for ingestion and deployment through the CDP Portal, **not** to public Docker Hub.
+After a supported branch build succeeds in GitHub Actions, check the resulting prerelease version in the CDP Portal.
 
 ### Docker Compose
 

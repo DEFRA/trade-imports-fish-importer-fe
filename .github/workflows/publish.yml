@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+      - 'feature/**'
+      - 'bugfix/**'
+      - 'ci/**'
 
 concurrency:
   group: $${{ github.workflow }}
@@ -27,12 +30,19 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: ${{ github.ref_name == 'main' && 1 || 0 }}
 
       - name: Test code and Create Test Coverage Reports
         uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
+
+      - name: Validate publishing branch
+        id: publish-branch
+        run: node scripts/publish-branch.js
+
       - run: |
           npm ci
           npm run build:frontend
@@ -42,6 +52,9 @@ jobs:
         uses: DEFRA/cdp-build-action/build@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: ${{ steps.publish-branch.outputs.prerelease }}
+          prerelease-suffix: ${{ steps.publish-branch.outputs.prerelease-suffix }}
+          push-dockerhub: ${{ steps.publish-branch.outputs.push-dockerhub }}
 
 #      - name: SonarCloud Scan
 #        uses: SonarSource/sonarqube-scan-action@v5.3.1 #  (or check latest version on https://github.com/marketplace/actions/official-sonarqube-scan)
