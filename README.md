@@ -183,9 +183,7 @@ Jira ticket numbers may contain any number of digits. Optional descriptions must
 separated by single hyphens. Invalid or unsupported non-main branch names fail validation before publishing.
 
 To publish a prerelease, open **Actions > Publish > Run workflow** in GitHub, select the supported branch, and click
-**Run workflow**. Temporarily, pushes to `feature/**` also publish prereleases so the full-branch suffix can be tested
-before manual dispatch is available on `main`. Remove this temporary push trigger and its job-condition allowance after
-the CDP check; the intended behavior is manual-only prerelease publishing. Bugfix and CI branch pushes remain disabled.
+**Run workflow**. Prerelease publishing is manual-only; pushes to feature, bugfix and CI branches do not publish.
 The manual trigger must first be merged into
 the default branch (`main`), and the selected branch must contain the updated workflow. Repository write access is required.
 Selecting `main` manually skips the build job and publishes nothing. Normal releases run only on pushes to `main`.
