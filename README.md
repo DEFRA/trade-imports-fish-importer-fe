@@ -172,16 +172,20 @@ docker run -p 3000:3000 trade-imports-fish-importer-fe
 
 ### Publishing
 
-The [Publish workflow](.github/workflows/publish.yml) keeps normal releases from `main`, including public Docker Hub
-publication. It also publishes prereleases from these branch forms:
+The [Publish workflow](.github/workflows/publish.yml) automatically publishes normal releases on pushes to `main`,
+including public Docker Hub publication. Prereleases are started manually for these branch forms:
 
 - `feature/FISB-1234` or `feature/FISB-1234-upload-documents`
 - `bugfix/FISB-1234` or `bugfix/FISB-1234-fix-upload`
 - `ci/FISB-1234` or `ci/FISB-1234-build-image`
 
 Jira ticket numbers may contain any number of digits. Optional descriptions must use lowercase letters and numbers,
-separated by single hyphens. Invalid names under these prefixes fail validation before publishing; other non-main
-branch prefixes do not trigger this workflow.
+separated by single hyphens. Invalid or unsupported non-main branch names fail validation before publishing.
+
+To publish a prerelease, open **Actions > Publish > Run workflow** in GitHub, select the supported branch, and click
+**Run workflow**. Branch pushes do not publish prereleases automatically. The manual trigger must first be merged into
+the default branch (`main`), and the selected branch must contain the updated workflow. Repository write access is required.
+Selecting `main` manually publishes a normal release, not a prerelease.
 
 The CDP build action uses only the lowercased Jira ticket as the prerelease suffix: for example, `fisb-1234`.
 It manages version increments automatically, producing versions such as `1.6.0-fisb-1234.0` and `1.6.0-fisb-1234.1`.
