@@ -40,9 +40,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - name: Validate publishing branch
-        id: publish-branch
-        run: node scripts/publish-branch.js
+      - name: Configure publishing settings
+        id: publish-settings
+        run: node scripts/configure-publish-settings.js
 
       - run: |
           npm ci
@@ -53,9 +53,9 @@ jobs:
         uses: DEFRA/cdp-build-action/build@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          prerelease: ${{ steps.publish-branch.outputs.prerelease }}
-          prerelease-suffix: ${{ steps.publish-branch.outputs.prerelease-suffix }}
-          push-dockerhub: ${{ steps.publish-branch.outputs.push-dockerhub }}
+          prerelease: ${{ steps.publish-settings.outputs.prerelease }}
+          prerelease-suffix: ${{ steps.publish-settings.outputs.prerelease-suffix }}
+          push-dockerhub: ${{ steps.publish-settings.outputs.push-dockerhub }}
 
 #      - name: SonarCloud Scan
 #        uses: SonarSource/sonarqube-scan-action@v5.3.1 #  (or check latest version on https://github.com/marketplace/actions/official-sonarqube-scan)

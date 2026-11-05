@@ -175,11 +175,11 @@ docker run -p 3000:3000 trade-imports-fish-importer-fe
 The [Publish workflow](.github/workflows/publish.yml) automatically publishes normal releases on pushes to `main`,
 including public Docker Hub publication. Prereleases are started manually for these branch forms:
 
-- `feature/FISB-1234` or `feature/FISB-1234-upload-documents`
-- `bugfix/FISB-1234` or `bugfix/FISB-1234-fix-upload`
-- `ci/FISB-1234` or `ci/FISB-1234-build-image`
+- `feature/FISB-1234-upload-documents`
+- `bugfix/FISB-1234-fix-upload`
+- `ci/FISB-1234-build-image`
 
-Jira ticket numbers may contain any number of digits. Optional descriptions must use lowercase letters and numbers,
+Jira ticket numbers may contain any number of digits. A description after the ticket number is required and must use lowercase letters and numbers,
 separated by single hyphens. Invalid or unsupported non-main branch names fail validation before publishing.
 
 To publish a prerelease, open **Actions > Publish > Run workflow** in GitHub, select the supported branch, and click

@@ -4,12 +4,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const script = fileURLToPath(new URL('./publish-branch.js', import.meta.url))
+const script = fileURLToPath(
+  new URL('./configure-publish-settings.js', import.meta.url)
+)
 let directory
 let outputFile
 
 beforeEach(() => {
-  directory = mkdtempSync(join(tmpdir(), 'publish-branch-'))
+  directory = mkdtempSync(join(tmpdir(), 'configure-publish-settings-'))
   outputFile = join(directory, 'output')
   writeFileSync(outputFile, '')
 })
@@ -42,13 +44,11 @@ test('preserves normal releases and Docker Hub publishing for main', () => {
 })
 
 test.each([
-  ['feature/FISB-1234', 'feature-fisb-1234'],
   ['feature/FISB-1234-upload-documents', 'feature-fisb-1234-upload-documents'],
-  ['bugfix/FISB-1234', 'bugfix-fisb-1234'],
   ['bugfix/FISB-1234-fix-upload', 'bugfix-fisb-1234-fix-upload'],
-  ['ci/FISB-1234', 'ci-fisb-1234'],
   ['ci/FISB-1234-build-image', 'ci-fisb-1234-build-image'],
-  ['feature/FISB-1', 'feature-fisb-1'],
+  ['feature/FISB-1-a', 'feature-fisb-1-a'],
+  ['feature/FISB-1234-123', 'feature-fisb-1234-123'],
   ['bugfix/FISB-1234567-fix-2-errors', 'bugfix-fisb-1234567-fix-2-errors']
 ])('uses an ECR-only full-branch prerelease for %s', (branch, suffix) => {
   const result = runScript(branch)
@@ -65,8 +65,7 @@ test('keeps suffixes distinct for branches sharing the same Jira ticket', () => 
     'feature/FISB-139-upload',
     'bugfix/FISB-139-upload',
     'ci/FISB-139-upload',
-    'feature/FISB-139-download',
-    'feature/FISB-139'
+    'feature/FISB-139-download'
   ]
   const suffixes = branches.map((branch) => {
     writeFileSync(outputFile, '')
@@ -108,6 +107,9 @@ test('rejects a suffix that cannot fit even the shortest Docker version tag', ()
 
 test.each([
   'develop',
+  'feature/FISB-1234',
+  'bugfix/FISB-1234',
+  'ci/FISB-1234',
   'hotfix/FISB-1234-fix-upload',
   'Feature/FISB-1234',
   'feature/fisb-1234',
@@ -128,8 +130,9 @@ test.each([
   expect(result.status).toBe(1)
   expect(result.stderr).toContain('Invalid publish branch')
   for (const prefix of ['feature', 'bugfix', 'ci']) {
-    expect(result.stderr).toContain(`${prefix}/FISB-<digits>`)
+    expect(result.stderr).toContain(`${prefix}/FISB-<digits>-<description>`)
   }
+  expect(result.stderr).toContain('description is required')
   expect(readFileSync(outputFile, 'utf8')).toBe('')
 })
 
