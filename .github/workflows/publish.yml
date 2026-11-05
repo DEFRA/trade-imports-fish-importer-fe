@@ -22,7 +22,10 @@ env:
 
 jobs:
   build:
-    if: github.run_number != 1
+    if: >-
+      github.run_number != 1 &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref_type == 'branch' && github.ref != 'refs/heads/main'))
     name: CDP-build-workflow
     runs-on: ubuntu-latest
     steps:

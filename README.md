@@ -185,7 +185,7 @@ separated by single hyphens. Invalid or unsupported non-main branch names fail v
 To publish a prerelease, open **Actions > Publish > Run workflow** in GitHub, select the supported branch, and click
 **Run workflow**. Branch pushes do not publish prereleases automatically. The manual trigger must first be merged into
 the default branch (`main`), and the selected branch must contain the updated workflow. Repository write access is required.
-Selecting `main` manually publishes a normal release, not a prerelease.
+Selecting `main` manually skips the build job and publishes nothing. Normal releases run only on pushes to `main`.
 
 The CDP build action uses only the lowercased Jira ticket as the prerelease suffix: for example, `fisb-1234`.
 It manages version increments automatically, producing versions such as `1.6.0-fisb-1234.0` and `1.6.0-fisb-1234.1`.
