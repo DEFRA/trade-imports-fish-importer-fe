@@ -17,8 +17,18 @@ if (branch !== 'main' && !match) {
 }
 
 const prerelease = branch !== 'main'
+const prereleaseSuffix = prerelease
+  ? branch.toLowerCase().replace('/', '-')
+  : ''
+
+// Even the shortest version needs eight characters beyond the suffix.
+if (prerelease && `0.0.0-${prereleaseSuffix}.0`.length > 128) {
+  throw new Error(
+    'Publish branch is too long: the prerelease suffix must not exceed 120 characters. Docker image tags are limited to 128 characters including the version and build number; the actual version may require a shorter branch name.'
+  )
+}
 
 appendFileSync(
   outputFile,
-  `prerelease=${prerelease}\nprerelease-suffix=${prerelease ? match[2].toLowerCase() : ''}\npush-dockerhub=${!prerelease}\n`
+  `prerelease=${prerelease}\nprerelease-suffix=${prereleaseSuffix}\npush-dockerhub=${!prerelease}\n`
 )
