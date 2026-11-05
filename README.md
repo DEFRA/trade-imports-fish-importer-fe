@@ -21,6 +21,7 @@ Core delivery platform Node.js Frontend Template.
 - [Docker](#docker)
   - [Development image](#development-image)
   - [Production image](#production-image)
+  - [Publishing](#publishing)
   - [Docker Compose](#docker-compose)
   - [Dependabot](#dependabot)
   - [SonarCloud](#sonarcloud)
@@ -168,6 +169,43 @@ Run:
 ```bash
 docker run -p 3000:3000 trade-imports-fish-importer-fe
 ```
+
+### Publishing
+
+The [Publish workflow](.github/workflows/publish.yml) automatically publishes normal releases on pushes to `main`,
+including public Docker Hub publication. Prereleases are started manually for these branch forms:
+
+- `feature/FISB-1234-upload-documents`
+- `bugfix/FISB-1234-fix-upload`
+- `ci/FISB-1234-build-image`
+
+Jira ticket numbers may contain any number of digits. A description after the ticket number is required and must use lowercase letters and numbers,
+separated by single hyphens. Invalid or unsupported non-main branch names fail validation before publishing.
+
+To publish a prerelease, open **Actions > Publish > Run workflow** in GitHub, select the supported branch, and click
+**Run workflow**. Prerelease publishing is manual-only; pushes to feature, bugfix and CI branches do not publish.
+The manual trigger must first be merged into
+the default branch (`main`), and the selected branch must contain the updated workflow. Repository write access is required.
+Selecting `main` manually skips the build job and publishes nothing. Normal releases run only on pushes to `main`.
+
+The CDP build action uses the full branch name as the prerelease suffix, lowercased with `/` replaced by `-`.
+For example, `feature/FISB-1234-upload-documents` uses `feature-fisb-1234-upload-documents`, producing versions such as
+`1.6.0-feature-fisb-1234-upload-documents.0` and `1.6.0-feature-fisb-1234-upload-documents.1`.
+Branch prefixes and descriptions distinguish branches even when they share the same Jira ticket.
+CDP manages the version base and increments; switching from the previous ticket-only suffix starts a separate
+prerelease sequence rather than continuing the old ticket-only sequence. Existing versions and tags remain untouched.
+Re-running the same commit may reuse its existing version; use a new commit when testing increments.
+
+Keep branch names short enough for Docker image tags: the complete version, including the suffix and build number,
+must fit within 128 characters. Validation rejects suffixes over 120 characters because even `0.0.0-<suffix>.0`
+would exceed that limit. This is only an upper bound, not a guarantee: a longer version base or build number leaves less
+room, and CDP's intermediate build-stage image tags add their own prefix and stage name. Names are never silently truncated.
+
+Prerelease images are published to ECR for ingestion and deployment through the CDP Portal, **not** to public Docker Hub.
+After a supported branch build succeeds in GitHub Actions, check the resulting prerelease version in the CDP Portal.
+The full-branch format still needs a live Portal check for readability, truncation and version selection, including a
+realistic longer branch name. Verify increments with two different commits on the same branch.
+Automatic tag cleanup is not enabled; it requires review after the Portal check. Deleting Git tags would not delete ECR images.
 
 ### Docker Compose
 
