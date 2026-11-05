@@ -230,3 +230,7 @@ information providers in the public sector to license the use and re-use of thei
 licence.
 
 It is designed to encourage use and re-use of information freely and flexibly, with only a few conditions.
+
+### Temporary section
+
+This section is being added temporarily and should be removed.
