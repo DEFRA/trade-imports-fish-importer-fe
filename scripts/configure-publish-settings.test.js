@@ -504,3 +504,189 @@ test('fails explicitly when the output file cannot be written', () => {
   expect(result.stderr).toContain('ENOENT')
   expect(readFileSync(outputFile, 'utf8')).toBe('')
 })
+
+test('allows #none history when no stable release tag is reachable', () => {
+  git('tag', 'v1.0.0-beta.0')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Documentation update #none')
+
+  const result = runScript('feature/FISB-139-upload')
+
+  expect(result.status).toBe(0)
+  expect(result.stderr).toBe('')
+  expect(readFileSync(outputFile, 'utf8')).toBe(
+    `prerelease=true\nprerelease-suffix=feature-fisb-139-upload${RUN_SUFFIX}\npush-dockerhub=false\n`
+  )
+})
+
+test('appends publishing outputs without replacing existing content', () => {
+  writeFileSync(outputFile, 'existing=value\n')
+
+  const result = runScript('main')
+
+  expect(result.status).toBe(0)
+  expect(result.stderr).toBe('')
+  expect(readFileSync(outputFile, 'utf8')).toBe(
+    'existing=value\nprerelease=false\nprerelease-suffix=\npush-dockerhub=true\n'
+  )
+})
+
+describe('script entry-point boundaries', () => {
+  let executeGit
+  let appendOutput
+
+  beforeEach(() => {
+    vi.resetModules()
+    executeGit = vi.fn()
+    appendOutput = vi.fn()
+    vi.doMock('node:child_process', () => ({ execFileSync: executeGit }))
+    vi.doMock('node:fs', () => ({ appendFileSync: appendOutput }))
+    vi.stubEnv('GITHUB_REF_NAME', 'feature/FISB-139-upload')
+    vi.stubEnv('GITHUB_OUTPUT', outputFile)
+    vi.stubEnv('GITHUB_RUN_ID', RUN_ID)
+    vi.stubEnv('GITHUB_RUN_ATTEMPT', RUN_ATTEMPT)
+  })
+
+  afterEach(() => {
+    vi.doUnmock('node:child_process')
+    vi.doUnmock('node:fs')
+    vi.resetModules()
+  })
+
+  test('main writes once without inspecting Git or validating run identifiers', async () => {
+    vi.stubEnv('GITHUB_REF_NAME', 'main')
+    vi.stubEnv('GITHUB_RUN_ID', 'invalid')
+    vi.stubEnv('GITHUB_RUN_ATTEMPT', '')
+
+    await import('./configure-publish-settings.js')
+
+    expect(executeGit).not.toHaveBeenCalled()
+    expect(appendOutput).toHaveBeenCalledExactlyOnceWith(
+      outputFile,
+      'prerelease=false\nprerelease-suffix=\npush-dockerhub=true\n'
+    )
+  })
+
+  test.each([
+    [
+      { GITHUB_REF_NAME: '', GITHUB_OUTPUT: '' },
+      'GITHUB_REF_NAME and GITHUB_OUTPUT are required'
+    ],
+    [
+      { GITHUB_REF_NAME: 'invalid', GITHUB_OUTPUT: '' },
+      'GITHUB_REF_NAME and GITHUB_OUTPUT are required'
+    ],
+    [
+      { GITHUB_REF_NAME: 'invalid', GITHUB_RUN_ID: '0' },
+      'Invalid publish branch.'
+    ],
+    [
+      {
+        GITHUB_REF_NAME: 'feature/FISB-139-'.padEnd(121, 'a'),
+        GITHUB_RUN_ID: '0'
+      },
+      'GITHUB_RUN_ID and GITHUB_RUN_ATTEMPT must be positive integers for prerelease publishing'
+    ],
+    [
+      { GITHUB_REF_NAME: 'feature/FISB-139-'.padEnd(121, 'a') },
+      'Publish branch is too long:'
+    ]
+  ])(
+    'validates %j before inspecting Git or writing outputs',
+    async (env, error) => {
+      for (const [key, value] of Object.entries(env)) {
+        vi.stubEnv(key, value)
+      }
+
+      await expect(import('./configure-publish-settings.js')).rejects.toThrow(
+        error
+      )
+
+      expect(executeGit).not.toHaveBeenCalled()
+      expect(appendOutput).not.toHaveBeenCalled()
+    }
+  )
+
+  test('preserves stable tag matching and HEAD tag ordering before reading history', async () => {
+    executeGit.mockReturnValue('v2.0.0\n2.0.0-beta.0\n1.0.0\nV3.0.0\n')
+
+    await expect(import('./configure-publish-settings.js')).rejects.toThrow(
+      'Cannot publish a prerelease from an already-released commit (v2.0.0, 1.0.0). Add a new commit after the stable release before publishing; CDP would otherwise reuse a stable ECR image tag.'
+    )
+
+    expect(executeGit).toHaveBeenCalledExactlyOnceWith(
+      'git',
+      ['tag', '--points-at', 'HEAD'],
+      { encoding: 'utf8' }
+    )
+    expect(appendOutput).not.toHaveBeenCalled()
+  })
+
+  test('uses the first stable tag in Git order with the exact history arguments', async () => {
+    executeGit
+      .mockReturnValueOnce('deployment-marker\n')
+      .mockReturnValueOnce('2.0.0-beta.0\nv1.0.0\n9.0.0\n')
+      .mockReturnValueOnce('Documentation update #none')
+
+    await expect(import('./configure-publish-settings.js')).rejects.toThrow(
+      'Cannot publish a prerelease: commit history since v1.0.0 contains #none without #major, #minor or #patch. CDP would reuse the stable ECR image tag. Add an intentional version-bump token or remove #none from the unreleased history before publishing.'
+    )
+
+    expect(executeGit.mock.calls).toEqual([
+      ['git', ['tag', '--points-at', 'HEAD'], { encoding: 'utf8' }],
+      [
+        'git',
+        ['tag', '--list', '--merged', 'HEAD', '--sort=-committerdate'],
+        { encoding: 'utf8' }
+      ],
+      ['git', ['log', 'v1.0.0..HEAD', '--format=%B'], { encoding: 'utf8' }]
+    ])
+    expect(appendOutput).not.toHaveBeenCalled()
+  })
+
+  test('does not read history without a reachable stable tag', async () => {
+    executeGit
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce('deployment-marker\nv1.0.0-beta.0\n')
+
+    await import('./configure-publish-settings.js')
+
+    expect(executeGit).toHaveBeenCalledTimes(2)
+    expect(appendOutput).toHaveBeenCalledExactlyOnceWith(
+      outputFile,
+      `prerelease=true\nprerelease-suffix=feature-fisb-139-upload${RUN_SUFFIX}\npush-dockerhub=false\n`
+    )
+  })
+
+  test.each([1, 2, 3])(
+    'propagates failure of Git call %s without writing outputs',
+    async (failedCall) => {
+      const error = new Error('Git inspection failed')
+      for (let call = 1; call < failedCall; call++) {
+        executeGit.mockReturnValueOnce(call === 1 ? '' : '1.0.0\n')
+      }
+      executeGit.mockImplementationOnce(() => {
+        throw error
+      })
+
+      await expect(import('./configure-publish-settings.js')).rejects.toBe(
+        error
+      )
+
+      expect(executeGit).toHaveBeenCalledTimes(failedCall)
+      expect(appendOutput).not.toHaveBeenCalled()
+    }
+  )
+
+  test('propagates output writing failures without retrying', async () => {
+    const error = new Error('Output writing failed')
+    vi.stubEnv('GITHUB_REF_NAME', 'main')
+    appendOutput.mockImplementationOnce(() => {
+      throw error
+    })
+
+    await expect(import('./configure-publish-settings.js')).rejects.toBe(error)
+
+    expect(executeGit).not.toHaveBeenCalled()
+    expect(appendOutput).toHaveBeenCalledTimes(1)
+  })
+})
