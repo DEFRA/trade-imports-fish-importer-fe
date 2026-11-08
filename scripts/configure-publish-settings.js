@@ -22,33 +22,16 @@ if (!isValidPublishBranch) {
 }
 
 const prerelease = !isMainBranch
-let prereleaseSuffix = ''
-
-if (prerelease) {
-  const runId = process.env.GITHUB_RUN_ID
-  const runAttempt = process.env.GITHUB_RUN_ATTEMPT
-  const positiveIntegerPattern = /^[1-9][0-9]*$/
-
-  if (
-    !runId ||
-    !runAttempt ||
-    !positiveIntegerPattern.test(runId) ||
-    !positiveIntegerPattern.test(runAttempt)
-  ) {
-    throw new Error(
-      'GITHUB_RUN_ID and GITHUB_RUN_ATTEMPT must be positive integers for prerelease publishing'
-    )
-  }
-
-  prereleaseSuffix = `${branch.toLowerCase().replace('/', '-')}-run-${runId}-attempt-${runAttempt}`
-}
+const prereleaseSuffix = prerelease
+  ? branch.toLowerCase().replace('/', '-')
+  : ''
 
 // Tags include a version and build number; 0.0.0 and 0 need the fewest characters.
 const shortestPossibleImageTag = `0.0.0-${prereleaseSuffix}.0`
 
 if (prerelease && shortestPossibleImageTag.length > MAX_DOCKER_TAG_LENGTH) {
   throw new Error(
-    'Publish branch is too long: the prerelease suffix, including the run ID and attempt, must not exceed 120 characters. Docker image tags are limited to 128 characters including the version and build number; the actual version may require a shorter branch name.'
+    'Publish branch is too long: the prerelease suffix must not exceed 120 characters. Docker image tags are limited to 128 characters including the version and build number; the actual version may require a shorter branch name.'
   )
 }
 

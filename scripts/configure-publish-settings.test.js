@@ -7,9 +7,6 @@ import { fileURLToPath } from 'node:url'
 const script = fileURLToPath(
   new URL('./configure-publish-settings.js', import.meta.url)
 )
-const RUN_ID = '1658821493'
-const RUN_ATTEMPT = '1'
-const RUN_SUFFIX = `-run-${RUN_ID}-attempt-${RUN_ATTEMPT}`
 let directory
 let outputFile
 
@@ -23,27 +20,15 @@ afterEach(() => {
   rmSync(directory, { recursive: true, force: true })
 })
 
-function runScript(
-  branch,
-  output = outputFile,
-  { runId = RUN_ID, runAttempt = RUN_ATTEMPT } = {}
-) {
+function runScript(branch, output = outputFile) {
   const env = { ...process.env }
   delete env.GITHUB_REF_NAME
   delete env.GITHUB_OUTPUT
-  delete env.GITHUB_RUN_ID
-  delete env.GITHUB_RUN_ATTEMPT
   if (branch !== undefined) {
     env.GITHUB_REF_NAME = branch
   }
   if (output !== undefined) {
     env.GITHUB_OUTPUT = output
-  }
-  if (runId) {
-    env.GITHUB_RUN_ID = runId
-  }
-  if (runAttempt) {
-    env.GITHUB_RUN_ATTEMPT = runAttempt
   }
   return spawnSync(process.execPath, [script], { env, encoding: 'utf8' })
 }
@@ -71,7 +56,7 @@ test.each([
   expect(result.status).toBe(0)
   expect(result.stderr).toBe('')
   expect(readFileSync(outputFile, 'utf8')).toBe(
-    `prerelease=true\nprerelease-suffix=${suffix}${RUN_SUFFIX}\npush-dockerhub=false\n`
+    `prerelease=true\nprerelease-suffix=${suffix}\npush-dockerhub=false\n`
   )
 })
 
@@ -89,9 +74,7 @@ test('keeps suffixes distinct for branches sharing the same Jira ticket', () => 
       .split('\n')
       .find((line) => line.startsWith('prerelease-suffix='))
       .slice('prerelease-suffix='.length)
-    expect(suffix).toBe(
-      `${branch.toLowerCase().replace('/', '-')}${RUN_SUFFIX}`
-    )
+    expect(suffix).toBe(branch.toLowerCase().replace('/', '-'))
     expect(suffix).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
     return suffix
   })
@@ -100,94 +83,27 @@ test('keeps suffixes distinct for branches sharing the same Jira ticket', () => 
 })
 
 test('preserves a 120-character suffix without truncation', () => {
-  const branch = 'feature/FISB-139-'.padEnd(120 - RUN_SUFFIX.length, 'a')
+  const branch = 'feature/FISB-139-'.padEnd(120, 'a')
   const result = runScript(branch)
 
   expect(result.status).toBe(0)
   expect(readFileSync(outputFile, 'utf8')).toBe(
-    `prerelease=true\nprerelease-suffix=${branch.toLowerCase().replace('/', '-')}${RUN_SUFFIX}\npush-dockerhub=false\n`
+    `prerelease=true\nprerelease-suffix=${branch.toLowerCase().replace('/', '-')}\npush-dockerhub=false\n`
   )
-  const imageTag = `0.0.0-${branch.toLowerCase().replace('/', '-')}${RUN_SUFFIX}.0`
+  const imageTag = `0.0.0-${branch.toLowerCase().replace('/', '-')}.0`
   expect(imageTag).toHaveLength(128)
 })
 
 test('rejects a suffix that cannot fit even the shortest Docker version tag', () => {
-  const result = runScript(
-    'feature/FISB-139-'.padEnd(121 - RUN_SUFFIX.length, 'a')
-  )
+  const result = runScript('feature/FISB-139-'.padEnd(121, 'a'))
 
   expect(result.status).toBe(1)
   expect(result.stderr).toContain(
-    'prerelease suffix, including the run ID and attempt, must not exceed 120 characters'
+    'prerelease suffix must not exceed 120 characters'
   )
   expect(result.stderr).toContain(
     'actual version may require a shorter branch name'
   )
-  expect(readFileSync(outputFile, 'utf8')).toBe('')
-})
-
-test('keeps publishes on the same branch distinct across runs and reruns', () => {
-  const branch = 'feature/FISB-139-upload'
-  const runs = [
-    { runId: RUN_ID, runAttempt: '1' },
-    { runId: RUN_ID, runAttempt: '2' },
-    { runId: '1658821500', runAttempt: '1' }
-  ]
-  const suffixes = runs.map((run) => {
-    writeFileSync(outputFile, '')
-    const result = runScript(branch, outputFile, run)
-
-    expect(result.status).toBe(0)
-    expect(result.stderr).toBe('')
-    const suffix = `${branch.toLowerCase().replace('/', '-')}-run-${run.runId}-attempt-${run.runAttempt}`
-    expect(readFileSync(outputFile, 'utf8')).toBe(
-      `prerelease=true\nprerelease-suffix=${suffix}\npush-dockerhub=false\n`
-    )
-    return suffix
-  })
-
-  expect(new Set(suffixes.map((suffix) => `1.6.0-${suffix}.0`)).size).toBe(3)
-})
-
-test.each(['runId', 'runAttempt'])(
-  'rejects missing or malformed %s without writing publishing outputs',
-  (field) => {
-    for (const value of ['', '0', '-1', '1.5', 'abc', '01', '1\n', ' 1']) {
-      const result = runScript('feature/FISB-139-upload', outputFile, {
-        [field]: value
-      })
-
-      expect(result.status).toBe(1)
-      expect(result.stderr).toContain(
-        'GITHUB_RUN_ID and GITHUB_RUN_ATTEMPT must be positive integers'
-      )
-      expect(readFileSync(outputFile, 'utf8')).toBe('')
-    }
-  }
-)
-
-test.each([
-  { runId: '', runAttempt: '' },
-  { runId: 'invalid', runAttempt: 'invalid' }
-])('does not require run identifiers for main: %j', (run) => {
-  const result = runScript('main', outputFile, run)
-
-  expect(result.status).toBe(0)
-  expect(result.stderr).toBe('')
-  expect(readFileSync(outputFile, 'utf8')).toBe(
-    'prerelease=false\nprerelease-suffix=\npush-dockerhub=true\n'
-  )
-})
-
-test('includes longer run IDs and attempts in the suffix length check', () => {
-  const branch = 'feature/FISB-139-'.padEnd(120 - RUN_SUFFIX.length, 'a')
-  const result = runScript(branch, outputFile, {
-    runId: `${RUN_ID}0`,
-    runAttempt: '10'
-  })
-
-  expect(result.status).toBe(1)
-  expect(result.stderr).toContain('Publish branch is too long')
   expect(readFileSync(outputFile, 'utf8')).toBe('')
 })
 

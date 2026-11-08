@@ -186,30 +186,29 @@ To publish a prerelease, push changes to a supported branch containing the updat
 The manual trigger and manual-only build condition are temporarily commented out in the workflow.
 Normal releases still run only on pushes to `main`.
 
-The CDP build action receives a prerelease suffix containing the full branch name, lowercased with `/` replaced by `-`,
-followed by `-run-<GITHUB_RUN_ID>-attempt-<GITHUB_RUN_ATTEMPT>`.
+The CDP build action receives the full branch name as the prerelease suffix, lowercased with `/` replaced by `-`.
 For example, `feature/FISB-1234-upload-documents` produces versions such as
-`1.6.0-feature-fisb-1234-upload-documents-run-1658821493-attempt-1.0`.
+`1.6.0-feature-fisb-1234-upload-documents.0` and `1.6.0-feature-fisb-1234-upload-documents.1`.
 Branch prefixes and descriptions distinguish branches even when they share the same Jira ticket.
-The run ID uniquely identifies a workflow run within the repository; starting another publish uses a new run ID.
-The attempt starts at `1` and increments when that same workflow run is rerun, while its run ID remains unchanged.
+The run ID and attempt have been temporarily removed from the suffix to reproduce the rebase collision.
 CDP discovers previous prereleases only among tags reachable from the branch. Rebasing can remove a tagged commit from
-that history, so the branch name alone cannot prevent reuse of an earlier version. The run/attempt component keeps
-prerelease suffixes distinct across publishes and reruns even after a rebase.
-CDP still manages the version base, but each publishing attempt starts a separate suffix sequence, normally ending in `.0`.
-Existing versions and tags remain untouched. Missing or invalid run identifiers fail validation before prerelease publishing.
+that history, so the branch name alone cannot prevent reuse of an earlier version. The old Git tags still exist,
+and publishing may overwrite an existing image before Git tag creation fails. Use a dedicated test branch.
+CDP manages the version base and prerelease increments. Re-running the same commit may reuse its existing version.
 
 Keep branch names short enough for Docker image tags: the complete version, including the suffix and build number,
-must fit within 128 characters. Validation rejects suffixes over 120 characters, including the run ID and attempt,
+must fit within 128 characters. Validation rejects suffixes over 120 characters,
 because even `0.0.0-<suffix>.0`
 would exceed that limit. This is only an upper bound, not a guarantee: a longer version base or build number leaves less
 room, and CDP's intermediate build-stage image tags add their own prefix and stage name. Names are never silently truncated.
 
 Prerelease images are published to ECR for ingestion and deployment through the CDP Portal, **not** to public Docker Hub.
 After a supported branch build succeeds in GitHub Actions, check the resulting prerelease version in the CDP Portal.
-The full-branch/run/attempt format still needs a live Portal check for readability, truncation and version selection,
-including a realistic longer branch name. Verify distinct Git and image tags by publishing a branch, rebasing and
-publishing again, then rerunning the workflow. Use a branch with untagged changes and no `#none` token for this check:
+The full-branch format still needs a live Portal check for readability, truncation and version selection,
+including a realistic longer branch name. To reproduce the collision, publish two commits separately, then squash both
+onto their original base and force-push with `--force-with-lease`. Wait for each build to finish before proceeding.
+If the calculated version base remains unchanged, the next publish can reuse `.0`.
+Use a branch with untagged changes and no `#none` token for this check:
 the upstream action can return a stable tag before prerelease generation when there are no changes or no version bump.
 Automatic tag cleanup is not enabled; it requires review after the Portal check. Deleting Git tags would not delete ECR images.
 
