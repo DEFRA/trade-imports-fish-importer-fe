@@ -26,7 +26,6 @@ env:
 jobs:
   build:
     # Temporary comment to trigger another push for deployment testing.
-    # Temporary second commit to test prerelease numbering before squashing.
     # Temporarily allow automatic prerelease publishing instead of manual-only runs.
     # if: >-
     #   github.run_number != 1 &&
