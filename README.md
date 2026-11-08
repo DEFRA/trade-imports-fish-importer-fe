@@ -183,6 +183,11 @@ Jira ticket numbers may contain any number of digits. A description after the ti
 separated by single hyphens. Invalid or unsupported non-main branch names fail validation before publishing.
 
 To publish a prerelease, push changes to a supported branch containing the updated workflow.
+Non-main publishing rejects HEAD if it carries a stable release tag (`1.6.0` or `v1.6.0`, including annotated tags),
+before invoking the CDP build action. Add a new commit after the stable release before publishing a branch created
+at that release; otherwise CDP can reuse the stable ECR image tag despite prerelease mode.
+Prerelease tags alone do not block publishing. The non-main checkout fetches full history and tags for this check,
+and a failed Git inspection stops publishing rather than bypassing validation.
 The manual trigger and manual-only build condition are temporarily commented out in the workflow.
 Normal releases still run only on pushes to `main`.
 
@@ -210,7 +215,8 @@ After a supported branch build succeeds in GitHub Actions, check the resulting p
 The full-branch/run/attempt format still needs a live Portal check for readability, truncation and version selection,
 including a realistic longer branch name. Verify distinct Git and image tags by publishing a branch, rebasing and
 publishing again, then rerunning the workflow. Use a branch with untagged changes and no `#none` token for this check:
-the upstream action can return a stable tag before prerelease generation when there are no changes or no version bump.
+The released-HEAD check prevents reuse due to no new commits, but the upstream action can still return a stable tag
+before prerelease generation when version bumping is skipped by `#none`; that separate case is not covered by this guard.
 Automatic tag cleanup is not enabled; it requires review after the Portal check. Deleting Git tags would not delete ECR images.
 
 ### Docker Compose

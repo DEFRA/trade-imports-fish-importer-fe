@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -17,16 +17,46 @@ beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), 'configure-publish-settings-'))
   outputFile = join(directory, 'output')
   writeFileSync(outputFile, '')
+  git('init', '--quiet')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Initial commit')
 })
 
 afterEach(() => {
   rmSync(directory, { recursive: true, force: true })
 })
 
+function git(...args) {
+  return execFileSync(
+    'git',
+    [
+      '-c',
+      'user.name=Publishing test',
+      '-c',
+      'user.email=publishing-test@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      '-c',
+      'tag.gpgsign=false',
+      '-c',
+      'core.hooksPath=/dev/null',
+      ...args
+    ],
+    {
+      cwd: directory,
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_CONFIG_NOSYSTEM: '1'
+      },
+      encoding: 'utf8'
+    }
+  )
+}
+
 function runScript(
   branch,
   output = outputFile,
-  { runId = RUN_ID, runAttempt = RUN_ATTEMPT } = {}
+  { runId = RUN_ID, runAttempt = RUN_ATTEMPT, cwd = directory } = {}
 ) {
   const env = { ...process.env }
   delete env.GITHUB_REF_NAME
@@ -45,10 +75,11 @@ function runScript(
   if (runAttempt) {
     env.GITHUB_RUN_ATTEMPT = runAttempt
   }
-  return spawnSync(process.execPath, [script], { env, encoding: 'utf8' })
+  return spawnSync(process.execPath, [script], { env, cwd, encoding: 'utf8' })
 }
 
 test('preserves normal releases and Docker Hub publishing for main', () => {
+  git('tag', '1.6.0')
   const result = runScript('main')
 
   expect(result.status).toBe(0)
@@ -56,6 +87,82 @@ test('preserves normal releases and Docker Hub publishing for main', () => {
   expect(readFileSync(outputFile, 'utf8')).toBe(
     'prerelease=false\nprerelease-suffix=\npush-dockerhub=true\n'
   )
+})
+
+test.each([
+  ['feature/FISB-1234-upload-documents', '1.6.0', false],
+  ['feature/FISB-1234-upload-documents', 'v1.6.0', true],
+  ['bugfix/FISB-1234-fix-upload', '1.6.0', true],
+  ['bugfix/FISB-1234-fix-upload', 'v1.6.0', false],
+  ['ci/FISB-1234-build-image', '1.6.0', false],
+  ['ci/FISB-1234-build-image', 'v1.6.0', true]
+])(
+  'rejects released HEAD on %s with stable tag %s (annotated: %s)',
+  (branch, tag, annotated) => {
+    git('tag', ...(annotated ? ['-a', '-m', 'Stable release'] : []), tag)
+    git('checkout', '--quiet', '-b', branch)
+
+    const result = runScript(branch)
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('already-released commit')
+    expect(result.stderr).toContain(tag)
+    expect(result.stderr).toContain('Add a new commit after the stable release')
+    expect(readFileSync(outputFile, 'utf8')).toBe('')
+  }
+)
+
+test('rejects a stable tag even when HEAD also has a prerelease tag', () => {
+  git('tag', '1.6.0')
+  git('tag', `1.7.0-feature-fisb-139-upload${RUN_SUFFIX}.0`)
+
+  const result = runScript('feature/FISB-139-upload')
+
+  expect(result.status).toBe(1)
+  expect(result.stderr).toContain('already-released commit (1.6.0)')
+  expect(readFileSync(outputFile, 'utf8')).toBe('')
+})
+
+test.each([
+  '1.7.0-feature-fisb-139-upload-run-123-attempt-1.0',
+  'v1.7.0-beta.0',
+  'deployment-marker'
+])('allows HEAD carrying only a non-stable tag: %s', (tag) => {
+  git('tag', tag)
+
+  const result = runScript('feature/FISB-139-upload')
+
+  expect(result.status).toBe(0)
+  expect(result.stderr).toBe('')
+  expect(readFileSync(outputFile, 'utf8')).toBe(
+    `prerelease=true\nprerelease-suffix=feature-fisb-139-upload${RUN_SUFFIX}\npush-dockerhub=false\n`
+  )
+})
+
+test('allows a new commit after a stable release with detached HEAD', () => {
+  git('tag', '-a', '-m', 'Stable release', '1.6.0')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Feature changes')
+  git('checkout', '--quiet', '--detach')
+
+  const result = runScript('feature/FISB-139-upload')
+
+  expect(result.status).toBe(0)
+  expect(result.stderr).toBe('')
+  expect(readFileSync(outputFile, 'utf8')).toBe(
+    `prerelease=true\nprerelease-suffix=feature-fisb-139-upload${RUN_SUFFIX}\npush-dockerhub=false\n`
+  )
+})
+
+test('fails without publishing outputs when Git cannot resolve HEAD', () => {
+  git('init', '--quiet', 'empty-repository')
+
+  const result = runScript('feature/FISB-139-upload', outputFile, {
+    cwd: join(directory, 'empty-repository')
+  })
+
+  expect(result.status).toBe(1)
+  expect(result.stderr).toContain('git tag --points-at HEAD')
+  expect(readFileSync(outputFile, 'utf8')).toBe('')
 })
 
 test.each([

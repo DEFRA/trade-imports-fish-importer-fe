@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 
 const MAX_DOCKER_TAG_LENGTH = 128
@@ -53,6 +54,20 @@ if (prerelease && shortestPossibleImageTag.length > MAX_DOCKER_TAG_LENGTH) {
 }
 
 const pushToDockerHub = !prerelease
+
+if (prerelease) {
+  const stableTagsAtHead = execFileSync('git', ['tag', '--points-at', 'HEAD'], {
+    encoding: 'utf8'
+  })
+    .split('\n')
+    .filter((tag) => /^v?[0-9]+\.[0-9]+\.[0-9]+$/.test(tag))
+
+  if (stableTagsAtHead.length > 0) {
+    throw new Error(
+      `Cannot publish a prerelease from an already-released commit (${stableTagsAtHead.join(', ')}). Add a new commit after the stable release before publishing; CDP would otherwise reuse a stable ECR image tag.`
+    )
+  }
+}
 
 appendFileSync(
   outputFile,
