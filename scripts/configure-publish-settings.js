@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 
 const MAX_DOCKER_TAG_LENGTH = 128
+const STABLE_RELEASE_TAG_PATTERN = /^v?[0-9]+\.[0-9]+\.[0-9]+$/
 
 const branch = process.env.GITHUB_REF_NAME
 const outputFile = process.env.GITHUB_OUTPUT
@@ -60,12 +61,38 @@ if (prerelease) {
     encoding: 'utf8'
   })
     .split('\n')
-    .filter((tag) => /^v?[0-9]+\.[0-9]+\.[0-9]+$/.test(tag))
+    .filter((tag) => STABLE_RELEASE_TAG_PATTERN.test(tag))
 
   if (stableTagsAtHead.length > 0) {
     throw new Error(
       `Cannot publish a prerelease from an already-released commit (${stableTagsAtHead.join(', ')}). Add a new commit after the stable release before publishing; CDP would otherwise reuse a stable ECR image tag.`
     )
+  }
+
+  // Match CDP's pinned tag action: reachable stable tags ordered by committer date.
+  const latestStableTag = execFileSync(
+    'git',
+    ['tag', '--list', '--merged', 'HEAD', '--sort=-committerdate'],
+    { encoding: 'utf8' }
+  )
+    .split('\n')
+    .find((tag) => STABLE_RELEASE_TAG_PATTERN.test(tag))
+
+  if (latestStableTag) {
+    const history = execFileSync(
+      'git',
+      ['log', `${latestStableTag}..HEAD`, '--format=%B'],
+      { encoding: 'utf8' }
+    )
+    const hasExplicitBump = ['#major', '#minor', '#patch'].some((token) =>
+      history.includes(token)
+    )
+
+    if (history.includes('#none') && !hasExplicitBump) {
+      throw new Error(
+        `Cannot publish a prerelease: commit history since ${latestStableTag} contains #none without #major, #minor or #patch. CDP would reuse the stable ECR image tag. Add an intentional version-bump token or remove #none from the unreleased history before publishing.`
+      )
+    }
   }
 }
 

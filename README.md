@@ -188,6 +188,12 @@ before invoking the CDP build action. Add a new commit after the stable release 
 at that release; otherwise CDP can reuse the stable ECR image tag despite prerelease mode.
 Prerelease tags alone do not block publishing. The non-main checkout fetches full history and tags for this check,
 and a failed Git inspection stops publishing rather than bypassing validation.
+Non-main publishing also rejects `#none` in commit messages since the newest reachable stable release
+(ordered by committer date, matching CDP) unless that same history contains `#major`, `#minor` or `#patch`.
+The check includes commit bodies and all commits in that range, not just the latest commit.
+Earlier prerelease tags do not reset the range. To unblock publishing, add an intentional version-bump token
+or remove `#none` from the unreleased history. Explicit bump tokens also affect eventual stable-release versioning.
+These checks do not change publishing on `main`.
 The manual trigger and manual-only build condition are temporarily commented out in the workflow.
 Normal releases still run only on pushes to `main`.
 
@@ -214,9 +220,9 @@ Prerelease images are published to ECR for ingestion and deployment through the 
 After a supported branch build succeeds in GitHub Actions, check the resulting prerelease version in the CDP Portal.
 The full-branch/run/attempt format still needs a live Portal check for readability, truncation and version selection,
 including a realistic longer branch name. Verify distinct Git and image tags by publishing a branch, rebasing and
-publishing again, then rerunning the workflow. Use a branch with untagged changes and no `#none` token for this check:
-The released-HEAD check prevents reuse due to no new commits, but the upstream action can still return a stable tag
-before prerelease generation when version bumping is skipped by `#none`; that separate case is not covered by this guard.
+publishing again, then rerunning the workflow. Use a branch with untagged changes and no `#none` token for this check.
+Preflight validation rejects released HEADs and `#none` histories without an explicit bump before CDP can reuse
+a stable ECR image tag.
 Automatic tag cleanup is not enabled; it requires review after the Portal check. Deleting Git tags would not delete ECR images.
 
 ### Docker Compose

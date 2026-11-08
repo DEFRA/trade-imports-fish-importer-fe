@@ -22,6 +22,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   rmSync(directory, { recursive: true, force: true })
 })
 
@@ -163,6 +164,153 @@ test('fails without publishing outputs when Git cannot resolve HEAD', () => {
   expect(result.status).toBe(1)
   expect(result.stderr).toContain('git tag --points-at HEAD')
   expect(readFileSync(outputFile, 'utf8')).toBe('')
+})
+
+test.each([
+  ['feature/FISB-139-upload', '1.6.0', false],
+  ['bugfix/FISB-139-upload', 'v1.6.0', true],
+  ['ci/FISB-139-build', '1.6.0', true]
+])(
+  'rejects #none history for %s after %s (annotated: %s)',
+  (branch, tag, annotated) => {
+    git('tag', ...(annotated ? ['-a', '-m', 'Stable release'] : []), tag)
+    for (const message of [
+      'First change',
+      'Second change',
+      'Third change',
+      'Documentation update\n\n#none',
+      'Fifth change'
+    ]) {
+      git('commit', '--allow-empty', '--quiet', '-m', message)
+    }
+
+    const result = runScript(branch)
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(
+      `commit history since ${tag} contains #none`
+    )
+    expect(result.stderr).toContain('CDP would reuse the stable ECR image tag')
+    expect(readFileSync(outputFile, 'utf8')).toBe('')
+  }
+)
+
+test('a prior prerelease tag does not reset the #none comparison history', () => {
+  git('tag', '1.6.0')
+  git('commit', '--allow-empty', '--quiet', '-m', 'First change')
+  expect(runScript('feature/FISB-139-upload').status).toBe(0)
+  git('tag', `1.7.0-feature-fisb-139-upload${RUN_SUFFIX}.0`)
+  writeFileSync(outputFile, '')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Documentation update #none')
+  git('tag', '1.7.0-feature-fisb-139-upload-run-123-attempt-1.0')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Further changes')
+
+  const result = runScript('feature/FISB-139-upload', outputFile, {
+    runId: '1658821500'
+  })
+
+  expect(result.status).toBe(1)
+  expect(result.stderr).toContain('commit history since 1.6.0 contains #none')
+  expect(readFileSync(outputFile, 'utf8')).toBe('')
+})
+
+test.each(['#major', '#minor', '#patch'])(
+  'allows %s to override #none anywhere in the compared history',
+  (token) => {
+    git('tag', '1.6.0')
+    git('commit', '--allow-empty', '--quiet', '-m', `Explicit bump ${token}`)
+    git(
+      'commit',
+      '--allow-empty',
+      '--quiet',
+      '-m',
+      'Documentation update #none'
+    )
+    git('commit', '--allow-empty', '--quiet', '-m', 'Further changes')
+
+    const result = runScript('feature/FISB-139-upload')
+
+    expect(result.status).toBe(0)
+    expect(result.stderr).toBe('')
+    expect(readFileSync(outputFile, 'utf8')).toBe(
+      `prerelease=true\nprerelease-suffix=feature-fisb-139-upload${RUN_SUFFIX}\npush-dockerhub=false\n`
+    )
+  }
+)
+
+test('uses the newest reachable stable commit rather than the highest version', () => {
+  git('tag', '9.0.0')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Documentation update #none')
+  vi.stubEnv('GIT_COMMITTER_DATE', '2030-01-01T00:00:00Z')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Later release')
+  git('tag', '1.6.0')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Further changes')
+
+  const result = runScript('feature/FISB-139-upload')
+
+  expect(result.status).toBe(0)
+  expect(result.stderr).toBe('')
+  expect(readFileSync(outputFile, 'utf8')).toBe(
+    `prerelease=true\nprerelease-suffix=feature-fisb-139-upload${RUN_SUFFIX}\npush-dockerhub=false\n`
+  )
+})
+
+test('a later explicit bump unblocks a previously rejected #none history', () => {
+  git('tag', '1.6.0')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Documentation update #none')
+  expect(runScript('feature/FISB-139-upload').status).toBe(1)
+  expect(readFileSync(outputFile, 'utf8')).toBe('')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Release changes #patch')
+
+  const result = runScript('feature/FISB-139-upload')
+
+  expect(result.status).toBe(0)
+  expect(result.stderr).toBe('')
+  expect(readFileSync(outputFile, 'utf8')).toBe(
+    `prerelease=true\nprerelease-suffix=feature-fisb-139-upload${RUN_SUFFIX}\npush-dockerhub=false\n`
+  )
+})
+
+test('ignores stable tags on unrelated branches', () => {
+  git('tag', '1.6.0')
+  const base = git('rev-parse', 'HEAD').trim()
+  git('checkout', '--quiet', '-b', 'unrelated')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Unrelated release')
+  git('tag', '9.0.0')
+  git('checkout', '--quiet', '--detach', base)
+  git('commit', '--allow-empty', '--quiet', '-m', 'Documentation update #none')
+
+  const result = runScript('feature/FISB-139-upload')
+
+  expect(result.status).toBe(1)
+  expect(result.stderr).toContain('commit history since 1.6.0 contains #none')
+  expect(readFileSync(outputFile, 'utf8')).toBe('')
+})
+
+test.each(['Regular change', 'Documentation update none', 'Update #NONE'])(
+  'allows history without the literal #none token: %s',
+  (message) => {
+    git('tag', '1.6.0')
+    git('commit', '--allow-empty', '--quiet', '-m', message)
+
+    const result = runScript('feature/FISB-139-upload')
+
+    expect(result.status).toBe(0)
+    expect(result.stderr).toBe('')
+  }
+)
+
+test('preserves main publishing when unreleased history contains #none', () => {
+  git('tag', '1.6.0')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Documentation update #none')
+
+  const result = runScript('main')
+
+  expect(result.status).toBe(0)
+  expect(result.stderr).toBe('')
+  expect(readFileSync(outputFile, 'utf8')).toBe(
+    'prerelease=false\nprerelease-suffix=\npush-dockerhub=true\n'
+  )
 })
 
 test.each([
