@@ -172,59 +172,52 @@ docker run -p 3000:3000 trade-imports-fish-importer-fe
 
 ### Publishing
 
-The [Publish workflow](.github/workflows/publish.yml) automatically publishes normal releases on pushes to `main`,
-including public Docker Hub publication. Prereleases are published manually from these branch forms:
+The [Publish workflow](.github/workflows/publish.yml) automatically publishes stable releases on pushes to `main`,
+including to public Docker Hub. Branch prereleases are published manually to ECR for deployment through the CDP Portal,
+not to Docker Hub.
+
+#### Publishing a prerelease
+
+Use one of these branch formats:
 
 - `feature/FISB-1234-upload-documents`
 - `bugfix/FISB-1234-fix-upload`
 - `ci/FISB-1234-build-image`
 
-Jira ticket numbers may contain any number of digits. A description after the ticket number is required and must use lowercase letters and numbers,
-separated by single hyphens. Invalid or unsupported non-main branch names fail validation before publishing.
+Ticket numbers can have any number of digits; descriptions must use lowercase letters and numbers separated by single hyphens.
+Keep names short: Docker image tags have a 128-character limit, including version and run/attempt details.
 
-To publish a prerelease, open the Publish workflow in GitHub Actions, select **Run workflow**, choose a supported branch,
-and run the workflow. Pushes to non-main branches do not publish prereleases.
-Non-main publishing rejects HEAD if it carries a stable release tag (`1.6.0` or `v1.6.0`, including annotated tags),
-before invoking the CDP build action. Add a new commit after the stable release before publishing a branch created
-at that release; otherwise CDP can reuse the stable ECR image tag despite prerelease mode.
-Prerelease tags alone do not block publishing. The non-main checkout fetches full history and tags for this check,
-and a failed Git inspection stops publishing rather than bypassing validation.
-Non-main publishing also rejects `#none` in commit messages since the newest reachable stable release
-(ordered by committer date, matching CDP) unless that same history contains `#major`, `#minor` or `#patch`.
-The check includes commit bodies and all commits in that range, not just the latest commit.
-Earlier prerelease tags do not reset the range. To unblock publishing, add an intentional version-bump token
-or remove `#none` from the unreleased history. Explicit bump tokens also affect eventual stable-release versioning.
-These checks do not change publishing on `main`.
-The manual trigger and manual-only build condition are temporarily commented out in the workflow.
-Normal releases still run only on pushes to `main`.
+In GitHub Actions, open **Publish**, select **Run workflow**, choose your branch and run it.
+Branch pushes do not publish prereleases. After publishing succeeds, select the resulting version in the CDP Portal.
 
-The CDP build action receives a prerelease suffix containing the full branch name, lowercased with `/` replaced by `-`,
-followed by `-run-<GITHUB_RUN_ID>-attempt-<GITHUB_RUN_ATTEMPT>`.
-For example, `feature/FISB-1234-upload-documents` produces versions such as
-`1.6.0-feature-fisb-1234-upload-documents-run-1658821493-attempt-1.0`.
-Branch prefixes and descriptions distinguish branches even when they share the same Jira ticket.
-The run ID uniquely identifies a workflow run within the repository; starting another publish uses a new run ID.
-The attempt starts at `1` and increments when that same workflow run is rerun, while its run ID remains unchanged.
-CDP discovers previous prereleases only among tags reachable from the branch. Rebasing can remove a tagged commit from
-that history, so the branch name alone cannot prevent reuse of an earlier version. The run/attempt component keeps
-prerelease suffixes distinct across publishes and reruns even after a rebase.
-CDP still manages the version base, but each publishing attempt starts a separate suffix sequence, normally ending in `.0`.
-Existing versions and tags remain untouched. Missing or invalid run identifiers fail validation before prerelease publishing.
+#### Understanding prerelease versions
 
-Keep branch names short enough for Docker image tags: the complete version, including the suffix and build number,
-must fit within 128 characters. Validation rejects suffixes over 120 characters, including the run ID and attempt,
-because even `0.0.0-<suffix>.0`
-would exceed that limit. This is only an upper bound, not a guarantee: a longer version base or build number leaves less
-room, and CDP's intermediate build-stage image tags add their own prefix and stage name. Names are never silently truncated.
+For example:
 
-Prerelease images are published to ECR for ingestion and deployment through the CDP Portal, **not** to public Docker Hub.
-After a supported branch build succeeds in GitHub Actions, check the resulting prerelease version in the CDP Portal.
-The full-branch/run/attempt format still needs a live Portal check for readability, truncation and version selection,
-including a realistic longer branch name. Verify distinct Git and image tags by publishing a branch, rebasing and
-publishing again, then rerunning the workflow. Use a branch with untagged changes and no `#none` token for this check.
-Preflight validation rejects released HEADs and `#none` histories without an explicit bump before CDP can reuse
-a stable ECR image tag.
-Automatic tag cleanup is not enabled; it requires review after the Portal check. Deleting Git tags would not delete ECR images.
+```text
+1.6.0-feature-fisb-1234-upload-documents-run-1658821493-attempt-1.0
+```
+
+CDP determines the base version (`1.6.0`). The suffix contains the full branch name, lowercased with `/` replaced by `-`,
+so branches sharing a ticket remain distinguishable. `run` is the GitHub Actions run ID; each new workflow run gets a new ID.
+`attempt` starts at `1` and increases on reruns of that same run.
+
+Together, run and attempt prevent version reuse, including after rebases, when earlier tagged commits may no longer
+be reachable. Each attempt has a unique suffix and starts a new prerelease sequence, so the final counter is always `.0`,
+not an incrementing build number.
+
+#### When publishing is blocked
+
+These safeguards prevent CDP from reusing a stable ECR image tag:
+
+- **Stable-tagged commit:** if the branch's latest commit carries a stable release tag (such as `1.6.0` or `v1.6.0`),
+  add a new commit before publishing. Prerelease tags alone do not block publishing.
+- **`#none` without an explicit bump:** commit messages, including bodies, since the latest reachable stable release
+  must not contain `#none` unless that history also contains `#major`, `#minor` or `#patch`.
+  Add an intentional bump token or remove `#none` from the unreleased history. Bump tokens also affect the eventual stable release.
+  Earlier prerelease tags do not reset this check.
+
+Unsupported branch names fail validation. These safeguards do not change publishing on `main`.
 
 ### Docker Compose
 
