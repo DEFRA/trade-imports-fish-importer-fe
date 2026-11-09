@@ -2,10 +2,10 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 
 const MAX_DOCKER_TAG_LENGTH = 128
-const STABLE_RELEASE_TAG_PATTERN = /^v?[0-9]+\.[0-9]+\.[0-9]+$/
+const STABLE_RELEASE_TAG_PATTERN = /^v?\d+\.\d+\.\d+$/
 const PRERELEASE_BRANCH_PATTERN =
-  /^(feature|bugfix|ci)\/(FISB-[0-9]+)-[a-z0-9]+(-[a-z0-9]+)*$/
-const POSITIVE_INTEGER_PATTERN = /^[1-9][0-9]*$/
+  /^(feature|bugfix|ci)\/(FISB-\d+)-[a-z0-9]+(-[a-z0-9]+)*$/
+const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
 
 const branch = process.env.GITHUB_REF_NAME
 const outputFile = process.env.GITHUB_OUTPUT
