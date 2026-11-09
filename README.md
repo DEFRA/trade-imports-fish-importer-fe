@@ -173,8 +173,8 @@ docker run -p 3000:3000 trade-imports-fish-importer-fe
 ### Publishing
 
 The [Publish workflow](.github/workflows/publish.yml) automatically publishes stable releases on pushes to `main`,
-including to public Docker Hub. Branch prereleases are published manually to ECR for deployment through the CDP Portal,
-not to Docker Hub.
+including to public Docker Hub. Pushes to `feature/`, `bugfix/` and `ci/` branches automatically publish prereleases to ECR
+for manual deployment through the CDP Portal, not to Docker Hub.
 
 #### Publishing a prerelease
 
@@ -187,8 +187,8 @@ Use one of these branch formats:
 Ticket numbers can have any number of digits; descriptions must use lowercase letters and numbers separated by single hyphens.
 Keep names short: Docker image tags have a 128-character limit, including version and run/attempt details.
 
-In GitHub Actions, open **Publish**, select **Run workflow**, choose your branch and run it.
-Branch pushes do not trigger the Publish workflow. After publishing succeeds, select the resulting version in the CDP Portal.
+Push a commit to your branch to trigger the **Publish** workflow in GitHub Actions.
+After publishing succeeds, select the resulting version in the CDP Portal to deploy it.
 
 #### Understanding prerelease versions
 
