@@ -173,7 +173,7 @@ docker run -p 3000:3000 trade-imports-fish-importer-fe
 ### Publishing
 
 The [Publish workflow](.github/workflows/publish.yml) automatically publishes normal releases on pushes to `main`,
-including public Docker Hub publication. Prereleases are temporarily published automatically on pushes to these branch forms:
+including public Docker Hub publication. Prereleases are published manually from these branch forms:
 
 - `feature/FISB-1234-upload-documents`
 - `bugfix/FISB-1234-fix-upload`
@@ -182,7 +182,8 @@ including public Docker Hub publication. Prereleases are temporarily published a
 Jira ticket numbers may contain any number of digits. A description after the ticket number is required and must use lowercase letters and numbers,
 separated by single hyphens. Invalid or unsupported non-main branch names fail validation before publishing.
 
-To publish a prerelease, push changes to a supported branch containing the updated workflow.
+To publish a prerelease, open the Publish workflow in GitHub Actions, select **Run workflow**, choose a supported branch,
+and run the workflow. Pushes to non-main branches do not publish prereleases.
 Non-main publishing rejects HEAD if it carries a stable release tag (`1.6.0` or `v1.6.0`, including annotated tags),
 before invoking the CDP build action. Add a new commit after the stable release before publishing a branch created
 at that release; otherwise CDP can reuse the stable ECR image tag despite prerelease mode.
