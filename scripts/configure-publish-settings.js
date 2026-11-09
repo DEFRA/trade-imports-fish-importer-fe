@@ -121,13 +121,17 @@ function findLatestReachableStableTag() {
 }
 
 function readGitTags(args) {
-  return execFileSync('git', args, { encoding: 'utf8' }).split('\n')
+  return execFileSync('/usr/bin/git', args, { encoding: 'utf8' }).split('\n')
 }
 
 function readHistorySince(stableTag) {
-  return execFileSync('git', ['log', `${stableTag}..HEAD`, '--format=%B'], {
-    encoding: 'utf8'
-  })
+  return execFileSync(
+    '/usr/bin/git',
+    ['log', `${stableTag}..HEAD`, '--format=%B'],
+    {
+      encoding: 'utf8'
+    }
+  )
 }
 
 function validateVersionBumpHistory(history, latestStableTag) {

@@ -154,6 +154,20 @@ test('allows a new commit after a stable release with detached HEAD', () => {
   )
 })
 
+test('uses trusted Git without relying on PATH for tags and history', () => {
+  git('tag', '1.6.0')
+  git('commit', '--allow-empty', '--quiet', '-m', 'Feature changes')
+  vi.stubEnv('PATH', directory)
+
+  const result = runScript('feature/FISB-139-upload')
+
+  expect(result.status).toBe(0)
+  expect(result.stderr).toBe('')
+  expect(readFileSync(outputFile, 'utf8')).toBe(
+    `prerelease=true\nprerelease-suffix=feature-fisb-139-upload${RUN_SUFFIX}\npush-dockerhub=false\n`
+  )
+})
+
 test('fails without publishing outputs when Git cannot resolve HEAD', () => {
   git('init', '--quiet', 'empty-repository')
 
@@ -614,7 +628,7 @@ describe('script entry-point boundaries', () => {
     )
 
     expect(executeGit).toHaveBeenCalledExactlyOnceWith(
-      'git',
+      '/usr/bin/git',
       ['tag', '--points-at', 'HEAD'],
       { encoding: 'utf8' }
     )
@@ -632,13 +646,17 @@ describe('script entry-point boundaries', () => {
     )
 
     expect(executeGit.mock.calls).toEqual([
-      ['git', ['tag', '--points-at', 'HEAD'], { encoding: 'utf8' }],
+      ['/usr/bin/git', ['tag', '--points-at', 'HEAD'], { encoding: 'utf8' }],
       [
-        'git',
+        '/usr/bin/git',
         ['tag', '--list', '--merged', 'HEAD', '--sort=-committerdate'],
         { encoding: 'utf8' }
       ],
-      ['git', ['log', 'v1.0.0..HEAD', '--format=%B'], { encoding: 'utf8' }]
+      [
+        '/usr/bin/git',
+        ['log', 'v1.0.0..HEAD', '--format=%B'],
+        { encoding: 'utf8' }
+      ]
     ])
     expect(appendOutput).not.toHaveBeenCalled()
   })
