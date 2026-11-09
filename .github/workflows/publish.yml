@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-      - 'feature/FISB-*'
-      - 'bugfix/FISB-*'
-      - 'ci/FISB-*'
   workflow_dispatch:
 
 concurrency:

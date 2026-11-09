@@ -188,7 +188,7 @@ Ticket numbers can have any number of digits; descriptions must use lowercase le
 Keep names short: Docker image tags have a 128-character limit, including version and run/attempt details.
 
 In GitHub Actions, open **Publish**, select **Run workflow**, choose your branch and run it.
-Branch pushes do not publish prereleases. After publishing succeeds, select the resulting version in the CDP Portal.
+Branch pushes do not trigger the Publish workflow. After publishing succeeds, select the resulting version in the CDP Portal.
 
 #### Understanding prerelease versions
 
