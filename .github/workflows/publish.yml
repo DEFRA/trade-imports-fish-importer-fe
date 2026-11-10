@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: $${{ github.workflow }}
@@ -21,18 +22,28 @@ env:
 
 jobs:
   build:
-    if: github.run_number != 1
+    if: >-
+      github.run_number != 1 &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref_type == 'branch' && github.ref != 'refs/heads/main'))
     name: CDP-build-workflow
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: ${{ github.ref_name == 'main' && 1 || 0 }}
 
       - name: Test code and Create Test Coverage Reports
         uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
+
+      - name: Configure publishing settings
+        id: publish-settings
+        run: node scripts/configure-publish-settings.js
+
       - run: |
           npm ci
           npm run build:frontend
@@ -42,6 +53,9 @@ jobs:
         uses: DEFRA/cdp-build-action/build@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: ${{ steps.publish-settings.outputs.prerelease }}
+          prerelease-suffix: ${{ steps.publish-settings.outputs.prerelease-suffix }}
+          push-dockerhub: ${{ steps.publish-settings.outputs.push-dockerhub }}
 
 #      - name: SonarCloud Scan
 #        uses: SonarSource/sonarqube-scan-action@v5.3.1 #  (or check latest version on https://github.com/marketplace/actions/official-sonarqube-scan)

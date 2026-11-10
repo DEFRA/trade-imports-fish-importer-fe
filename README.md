@@ -21,6 +21,7 @@ Core delivery platform Node.js Frontend Template.
 - [Docker](#docker)
   - [Development image](#development-image)
   - [Production image](#production-image)
+  - [Publishing](#publishing)
   - [Docker Compose](#docker-compose)
   - [Dependabot](#dependabot)
   - [SonarCloud](#sonarcloud)
@@ -168,6 +169,55 @@ Run:
 ```bash
 docker run -p 3000:3000 trade-imports-fish-importer-fe
 ```
+
+### Publishing
+
+The [Publish workflow](.github/workflows/publish.yml) automatically publishes stable releases on pushes to `main`,
+including to public Docker Hub. Branch prereleases are published manually to ECR for deployment through the CDP Portal,
+not to Docker Hub.
+
+#### Publishing a prerelease
+
+Use one of these branch formats:
+
+- `feature/FISB-1234-upload-documents`
+- `bugfix/FISB-1234-fix-upload`
+- `ci/FISB-1234-build-image`
+
+Ticket numbers can have any number of digits; descriptions must use lowercase letters and numbers separated by single hyphens.
+Keep names short: Docker image tags have a 128-character limit, including version and run/attempt details.
+
+In GitHub Actions, open **Publish**, select **Run workflow**, choose your branch and run it.
+Branch pushes do not trigger the Publish workflow. After publishing succeeds, select the resulting version in the CDP Portal.
+
+#### Understanding prerelease versions
+
+For example:
+
+```text
+1.6.0-feature-fisb-1234-upload-documents-run-1658821493-attempt-1.0
+```
+
+CDP determines the base version (`1.6.0`). The suffix contains the full branch name, lowercased with `/` replaced by `-`,
+so branches sharing a ticket remain distinguishable. `run` is the GitHub Actions run ID; each new workflow run gets a new ID.
+`attempt` starts at `1` and increases on reruns of that same run.
+
+Together, run and attempt prevent version reuse, including after rebases, when earlier tagged commits may no longer
+be reachable. Each attempt has a unique suffix and starts a new prerelease sequence, so the final counter is always `.0`,
+not an incrementing build number.
+
+#### When publishing is blocked
+
+These safeguards prevent CDP from reusing a stable ECR image tag:
+
+- **Stable-tagged commit:** if the branch's latest commit carries a stable release tag (such as `1.6.0` or `v1.6.0`),
+  add a new commit before publishing. Prerelease tags alone do not block publishing.
+- **`#none` without an explicit bump:** commit messages, including bodies, since the latest reachable stable release
+  must not contain `#none` unless that history also contains `#major`, `#minor` or `#patch`.
+  Add an intentional bump token or remove `#none` from the unreleased history. Bump tokens also affect the eventual stable release.
+  Earlier prerelease tags do not reset this check.
+
+Unsupported branch names fail validation. These safeguards do not change publishing on `main`.
 
 ### Docker Compose
 
