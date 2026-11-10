@@ -183,6 +183,7 @@ Use one of these branch formats:
 - `feature/FISB-1234-upload-documents`
 - `bugfix/FISB-1234-fix-upload`
 - `ci/FISB-1234-build-image`
+- `chore/FISB-1234-update-dependencies`
 
 Ticket numbers can have any number of digits; descriptions must use lowercase letters and numbers separated by single hyphens.
 Keep names short: Docker image tags have a 128-character limit, including version and run/attempt details.

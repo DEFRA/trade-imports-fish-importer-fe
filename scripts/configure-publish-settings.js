@@ -4,7 +4,7 @@ import { appendFileSync } from 'node:fs'
 const MAX_DOCKER_TAG_LENGTH = 128
 const STABLE_RELEASE_TAG_PATTERN = /^v?\d+\.\d+\.\d+$/
 const PRERELEASE_BRANCH_PATTERN =
-  /^(feature|bugfix|ci)\/(FISB-\d+)-[a-z0-9]+(-[a-z0-9]+)*$/
+  /^(feature|bugfix|ci|chore)\/(FISB-\d+)-[a-z0-9]+(-[a-z0-9]+)*$/
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
 
 const currentBranch = process.env.GITHUB_REF_NAME
@@ -40,7 +40,7 @@ function validateRequiredEnvironment(branch, outputFile) {
 function validatePublishBranch(branch) {
   if (isPrereleaseBranch(branch) && !PRERELEASE_BRANCH_PATTERN.test(branch)) {
     throw new Error(
-      'Invalid publish branch. Expected main or feature/FISB-<digits>-<description>, bugfix/FISB-<digits>-<description>, or ci/FISB-<digits>-<description>. A lowercase, hyphen-separated description is required (for example feature/FISB-1234-upload-documents).'
+      'Invalid publish branch. Expected main or feature/FISB-<digits>-<description>, bugfix/FISB-<digits>-<description>, ci/FISB-<digits>-<description>, or chore/FISB-<digits>-<description>. A lowercase, hyphen-separated description is required (for example feature/FISB-1234-upload-documents).'
     )
   }
 }

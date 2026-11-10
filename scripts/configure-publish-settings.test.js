@@ -96,7 +96,9 @@ test.each([
   ['bugfix/FISB-1234-fix-upload', '1.6.0', true],
   ['bugfix/FISB-1234-fix-upload', 'v1.6.0', false],
   ['ci/FISB-1234-build-image', '1.6.0', false],
-  ['ci/FISB-1234-build-image', 'v1.6.0', true]
+  ['ci/FISB-1234-build-image', 'v1.6.0', true],
+  ['chore/FISB-1234-update-dependencies', '1.6.0', false],
+  ['chore/FISB-1234-update-dependencies', 'v1.6.0', true]
 ])(
   'rejects released HEAD on %s with stable tag %s (annotated: %s)',
   (branch, tag, annotated) => {
@@ -331,6 +333,10 @@ test.each([
   ['feature/FISB-1234-upload-documents', 'feature-fisb-1234-upload-documents'],
   ['bugfix/FISB-1234-fix-upload', 'bugfix-fisb-1234-fix-upload'],
   ['ci/FISB-1234-build-image', 'ci-fisb-1234-build-image'],
+  [
+    'chore/FISB-1234-update-dependencies',
+    'chore-fisb-1234-update-dependencies'
+  ],
   ['feature/FISB-1-a', 'feature-fisb-1-a'],
   ['feature/FISB-1234-123', 'feature-fisb-1234-123'],
   ['bugfix/FISB-1234567-fix-2-errors', 'bugfix-fisb-1234567-fix-2-errors']
@@ -349,6 +355,7 @@ test('keeps suffixes distinct for branches sharing the same Jira ticket', () => 
     'feature/FISB-139-upload',
     'bugfix/FISB-139-upload',
     'ci/FISB-139-upload',
+    'chore/FISB-139-upload',
     'feature/FISB-139-download'
   ]
   const suffixes = branches.map((branch) => {
@@ -465,6 +472,10 @@ test.each([
   'feature/FISB-1234',
   'bugfix/FISB-1234',
   'ci/FISB-1234',
+  'chore/FISB-1234',
+  'chore/fisb-1234-update-dependencies',
+  'chore/FISB-1234-Update-dependencies',
+  'chore/FISB-1234-update--dependencies',
   'hotfix/FISB-1234-fix-upload',
   'Feature/FISB-1234',
   'feature/fisb-1234',
@@ -484,7 +495,7 @@ test.each([
 
   expect(result.status).toBe(1)
   expect(result.stderr).toContain('Invalid publish branch')
-  for (const prefix of ['feature', 'bugfix', 'ci']) {
+  for (const prefix of ['feature', 'bugfix', 'ci', 'chore']) {
     expect(result.stderr).toContain(`${prefix}/FISB-<digits>-<description>`)
   }
   expect(result.stderr).toContain('description is required')
