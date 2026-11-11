@@ -39,7 +39,7 @@ jobs:
       - name: Test Docker Image Build
         run: |
           set +e
-          docker build --no-cache --tag cdp-node-frontend-template .
+          docker build --no-cache --tag trade-imports-fish-importer-fe .
           exit $?
 
       - name: SonarCloud Scan
