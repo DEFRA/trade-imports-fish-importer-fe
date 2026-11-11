@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: $${{ github.workflow }}
+  group: ${{ github.workflow }}
   cancel-in-progress: false
   queue: max
 
@@ -57,9 +57,7 @@ jobs:
           prerelease-suffix: ${{ steps.publish-settings.outputs.prerelease-suffix }}
           push-dockerhub: ${{ steps.publish-settings.outputs.push-dockerhub }}
 
-#      - name: SonarCloud Scan
-#        uses: SonarSource/sonarqube-scan-action@v5.3.1 #  (or check latest version on https://github.com/marketplace/actions/official-sonarqube-scan)
-#        continue-on-error: true
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v8.4.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
