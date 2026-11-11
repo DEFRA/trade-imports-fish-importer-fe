@@ -12,6 +12,7 @@ Core delivery platform Node.js Frontend Template.
 - [Redis](#redis)
 - [Local Development](#local-development)
   - [Setup](#setup)
+  - [Signed Commits](#signed-commits)
   - [Development](#development)
   - [Production](#production)
   - [Npm scripts](#npm-scripts)
@@ -76,11 +77,167 @@ No additional proxy configuration is required in the service.
 
 ### Setup
 
+Before making your first commit, follow the [Signed Commits](#signed-commits) setup.
+
 Install application dependencies:
 
 ```bash
 npm install
 ```
+
+### Signed Commits
+
+Commits to this repository must be signed. SSH signing is recommended; follow these steps so GitHub shows your commits as **Verified**.
+
+#### 1. Prerequisites
+
+- Git 2.34 or later is required for SSH signing. Check your version:
+
+  ```bash
+  git --version
+  ```
+
+- You already have an SSH key pair. Key creation is outside this guide;
+  see [GitHub's SSH key generation documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
+- Find the filename of your public key (it ends in `.pub`):
+
+  ```bash
+  ls ~/.ssh/*.pub
+  ```
+
+  The commands in this guide use `~/.ssh/id_ed25519.pub` as an example. **If your key has a different name** (for example
+  `~/.ssh/github_signing.pub`), replace `id_ed25519` with your key's name in every command. Otherwise you will get a
+  `No such file or directory` error.
+
+- Use a Bash-compatible terminal, such as Terminal on macOS/Linux or Git Bash on Windows.
+
+#### 2. Configure Git to sign with SSH
+
+These settings apply globally to all your repositories. Repository-local settings can override them.
+
+```bash
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git config --global commit.gpgsign true
+```
+
+- `gpg.format ssh` selects SSH instead of GPG for signing.
+- `user.signingkey` points to your SSH public key. The matching private key must be available to your SSH agent;
+  if needed, load it into your running agent with `ssh-add ~/.ssh/id_ed25519`.
+- `commit.gpgsign true` signs new commits automatically. The setting keeps its name even when signing with SSH.
+
+Optionally, sign tags automatically too:
+
+```bash
+git config --global tag.gpgsign true
+```
+
+Check the email Git will use from inside this repository:
+
+```bash
+git config --get user.email
+```
+
+It must match a verified email on your GitHub account under **Settings > Emails**; otherwise commits can show as **Unverified**.
+If necessary, set it for this repository, replacing the example with your verified email:
+
+```bash
+git config user.email "your-verified-email@example.com"
+```
+
+#### 3. Add the key to GitHub as a signing key
+
+1. Display your public key and copy the entire output:
+
+   ```bash
+   cat ~/.ssh/id_ed25519.pub
+   ```
+
+2. Go to **GitHub > Settings > SSH and GPG keys > New SSH key**.
+3. Give it a descriptive title, set **Key type** to **Signing Key**, paste the public key and select **Add SSH key**.
+   Only ever share the `.pub` file; never paste your private key.
+
+> ⚠️ **Important: authentication keys and signing keys are separate.**
+>
+> A key added as an **Authentication Key** (used for cloning, pushing and pulling) does **not** verify commits.
+> If you use the same key for both, add it to GitHub twice: once with **Key type** set to **Authentication Key**
+> and once with it set to **Signing Key**.
+
+#### 4. Verify locally and on GitHub
+
+**a. Allow Git to check SSH signatures locally.** Git needs an "allowed signers" file that maps your email to your key.
+Without it, `git log --show-signature` fails with a `gpg.ssh.allowedSignersFile` error. Run these once, from inside this
+repository so the email used matches your commits:
+
+```bash
+echo "$(git config --get user.email) $(cat ~/.ssh/id_ed25519.pub)" >> ~/.ssh/allowed_signers
+git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
+```
+
+This only affects local checks; it adds a line without replacing existing entries. GitHub uses the signing key on your
+account instead.
+
+**b. Make a test commit on a throwaway branch and check it locally.** Start from a branch without unpublished commits,
+such as `main`, so you don't push other work. Keep the same terminal open for cleanup:
+
+```bash
+test_branch="test/signed-commits-$(date +%Y%m%d-%H%M%S)-$$"
+git switch -c "$test_branch" &&
+  git commit --allow-empty --only -m "chore: verify signed commits" &&
+  git log --show-signature -1
+```
+
+You should see `Good "git" signature for <your-email>`. Together, `--allow-empty --only` create an empty commit without
+including any staged changes. If a command fails, resolve the error before continuing.
+
+**c. Check it on GitHub.** A good local result doesn't prove that GitHub will verify the commit, so push the branch:
+
+```bash
+git push -u origin HEAD
+```
+
+On GitHub, open the branch's commit history and confirm the commit shows **Verified**. Select the badge to see the
+signature details.
+
+**d. Clean up** by returning to your previous branch and deleting the test branch locally and on GitHub. Only do this
+if you have not added other work to the test branch:
+
+```bash
+git switch - &&
+  git branch -D "$test_branch" &&
+  git push origin --delete "$test_branch"
+```
+
+Signing applies to new commits only; commits you made before this setup stay unsigned.
+
+**Already working on a ticket branch?** You don't need to switch branches or restart your work. Set up signing on your
+current branch; your next commits will be signed. To sign your latest unsigned commit as well, if it is your own and no
+one else is working from it, run:
+
+```bash
+git commit --amend --no-edit --only -S
+```
+
+This changes the commit ID. If you have already pushed that commit, coordinate with your team before updating the remote;
+rewriting a shared branch can disrupt other people's work. For multiple earlier commits, agree with your team on how to
+rewrite the branch history before proceeding.
+
+#### 5. GPG alternative
+
+GPG signing is also supported. If you prefer GPG, follow
+[GitHub's GPG signing setup](https://docs.github.com/en/authentication/managing-commit-signature-verification/telling-git-about-your-signing-key#telling-git-about-your-gpg-key)
+instead of the SSH configuration above.
+
+#### 6. Troubleshooting
+
+- **Commit shows Unverified:** check that the key is registered as a **Signing Key**, not just an **Authentication Key**,
+  and that the commit email matches a verified email on your GitHub account. Inspect the commit's email with
+  `git log -1 --format='%ae %ce'` (author and committer).
+- **`allowedSignersFile` error:** follow [step 4a](#4-verify-locally-and-on-github) to configure the local allowed signers file.
+- **Commit fails with a signing or key error:** check that the `user.signingkey` path exists
+  (`git config --get user.signingkey`) and that your key is loaded in the SSH agent (`ssh-add -l`; load it with
+  `ssh-add ~/.ssh/id_ed25519`).
+- **Older Git version:** [upgrade Git](https://git-scm.com/downloads) to 2.34 or later.
 
 ### Git hooks
 
