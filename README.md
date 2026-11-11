@@ -89,7 +89,7 @@ npm install
 
 Commits to this repository must be signed.
 
-> 🔑 **Our team signs commits with SSH keys.** This guide covers SSH only. GitHub also supports GPG; see
+> 🔑 **We prefer signing commits with SSH keys.** This guide covers SSH only. GitHub also supports GPG; see
 > [GPG alternative](#gpg-alternative) if you prefer to use it instead.
 
 Steps 1 to 3 are required. Step 4 is optional.
