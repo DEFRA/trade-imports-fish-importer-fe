@@ -48,6 +48,7 @@ describe('#guidanceController', () => {
     expect(content).toContain(
       'The documents you need depend on the journey your seafood has taken through the supply chain.'
     )
+    expect(content).toContain('a Non-Manipulation Declaration')
     expect(content).toContain(
       'The service will identify and extract information from your documents to help complete your notification.'
     )
