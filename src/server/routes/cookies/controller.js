@@ -7,6 +7,7 @@ export const cookiePolicyController = {
   method: 'GET',
   path: '/cookies',
   options: {
+    auth: false,
     validate: {
       query: Joi.object({
         updated: Joi.boolean().default(false)
@@ -28,6 +29,7 @@ export const updateCookiePreferencesController = {
   method: 'POST',
   path: '/cookies',
   options: {
+    auth: false,
     validate: {
       payload: Joi.object().keys({
         analytics: Joi.boolean().required(),

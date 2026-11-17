@@ -13,6 +13,26 @@ const isProduction = process.env.NODE_ENV === 'production'
 const isTest = process.env.NODE_ENV === 'test'
 const isDevelopment = process.env.NODE_ENV === 'development'
 
+const cdpEnvironments = [
+  'local',
+  'infra-dev',
+  'management',
+  'dev',
+  'test',
+  'perf-test',
+  'ext-test',
+  'prod'
+]
+const cdpEnvironment = process.env.ENVIRONMENT ?? 'local'
+
+// Inside CDP, services call each other directly on their internal domain
+function defaultNotificationApiUrl() {
+  if (cdpEnvironment === 'local') {
+    return 'http://localhost:8085'
+  }
+  return `https://trade-imports-fish-be.${cdpEnvironment}.cdp-int.defra.cloud`
+}
+
 convict.addFormats(convictFormatWithValidator)
 
 export const config = convict({
@@ -45,6 +65,18 @@ export const config = convict({
     doc: 'Applications Service Name',
     format: String,
     default: 'trade-imports-fish-importer-fe'
+  },
+  cdpEnvironment: {
+    doc: 'The CDP environment the app is running in, injected by the platform',
+    format: cdpEnvironments,
+    default: 'local',
+    env: 'ENVIRONMENT'
+  },
+  notificationApiUrl: {
+    doc: 'Base URL for the fish notification backend, derived from ENVIRONMENT unless set',
+    format: 'url',
+    default: defaultNotificationApiUrl(),
+    env: 'NOTIFICATION_API_URL'
   },
   root: {
     doc: 'Project root',
@@ -94,9 +126,11 @@ export const config = convict({
     redact: {
       doc: 'Log paths to redact',
       format: Array,
-      default: isProduction
-        ? ['req.headers.authorization', 'req.headers.cookie', 'res.headers']
-        : [],
+      default: [
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'res.headers'
+      ],
       env: 'LOG_REDACT'
     }
   },
@@ -112,6 +146,14 @@ export const config = convict({
     format: Boolean,
     default: isProduction,
     env: 'ENABLE_SECURE_CONTEXT'
+  },
+  auth: {
+    testUserSignInEnabled: {
+      doc: 'Enable test user sign-in only in the local, dev and test environments',
+      format: Boolean,
+      default: false,
+      env: 'TEST_USER_SIGN_IN_ENABLED'
+    }
   },
   session: {
     cache: {

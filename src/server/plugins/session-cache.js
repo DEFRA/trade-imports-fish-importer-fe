@@ -16,6 +16,7 @@ export const sessionCache = {
       expiresIn: sessionConfig.cache.ttl
     },
     storeBlank: false,
+    maxCookieSize: 0,
     errorOnCacheNotReady: true,
     cookieOptions: {
       password: sessionConfig.cookie.password,
