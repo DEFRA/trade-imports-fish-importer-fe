@@ -10,8 +10,8 @@
   },
   "scripts": {
     "build:frontend": "vite build",
-    "dev": "AWS_EMF_ENVIRONMENT=Local TEMPORARY_SIGN_IN_ENABLED=true npm run server:watch",
-    "dev:debug": "AWS_EMF_ENVIRONMENT=Local TEMPORARY_SIGN_IN_ENABLED=true npm run server:debug",
+    "dev": "ENVIRONMENT=local AWS_EMF_ENVIRONMENT=Local TEMPORARY_SIGN_IN_ENABLED=true npm run server:watch",
+    "dev:debug": "ENVIRONMENT=local AWS_EMF_ENVIRONMENT=Local TEMPORARY_SIGN_IN_ENABLED=true npm run server:debug",
     "docker:dev": "npm run dev",
     "format": "prettier --write \"src/**/*.js\" \"**/*.{js,cjs,md,json,config.js,test.js}\"",
     "format:check": "prettier --check \"src/**/*.js\" \"**/*.{js,cjs,md,json,config.js,test.js}\"",

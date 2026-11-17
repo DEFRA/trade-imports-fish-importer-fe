@@ -32,17 +32,21 @@ describe('Temporary authentication', () => {
   let server
   const originalConfig = {
     enabled: config.get('auth.temporarySignInEnabled'),
+    cdpEnvironment: config.get('cdpEnvironment'),
     organisationId: config.get('auth.testOrganisationId'),
     isProduction: config.get('isProduction'),
-    serviceVersion: config.get('serviceVersion')
+    serviceVersion: config.get('serviceVersion'),
+    cookieSecure: config.get('session.cookie.secure')
   }
   const authCookieName = `${config.get('serviceName')}_auth`
 
   function localConfig() {
     config.set('auth.temporarySignInEnabled', true)
+    config.set('cdpEnvironment', 'local')
     config.set('auth.testOrganisationId', 'stub-org-1')
     config.set('isProduction', false)
     config.set('serviceVersion', null)
+    config.set('session.cookie.secure', false)
   }
 
   beforeAll(async () => {
@@ -61,20 +65,25 @@ describe('Temporary authentication', () => {
   afterAll(async () => {
     await server?.stop({ timeout: 0 })
     config.set('auth.temporarySignInEnabled', originalConfig.enabled)
+    config.set('cdpEnvironment', originalConfig.cdpEnvironment)
     config.set('auth.testOrganisationId', originalConfig.organisationId)
     config.set('isProduction', originalConfig.isProduction)
     config.set('serviceVersion', originalConfig.serviceVersion)
+    config.set('session.cookie.secure', originalConfig.cookieSecure)
   })
 
-  async function signIn({ cookies = '', returnTo = '/', payload = {} } = {}) {
-    const page = await server.inject({
+  async function signIn(
+    { cookies = '', returnTo = '/', payload = {} } = {},
+    instance = server
+  ) {
+    const page = await instance.inject({
       method: 'GET',
       url: `/auth/sign-in?returnTo=${encodeURIComponent(returnTo)}`,
       headers: { cookie: cookies }
     })
     const $ = cheerio.load(page.payload)
     const crumb = $('main input[name="crumb"]').val()
-    const response = await server.inject({
+    const response = await instance.inject({
       method: 'POST',
       url: $('main form').attr('action'),
       headers: {
@@ -369,33 +378,95 @@ describe('Temporary authentication', () => {
     expect(response.headers.location).toBeUndefined()
   })
 
-  test('disabled mode registers no temporary routes and keeps protected routes closed', async () => {
-    config.set('auth.temporarySignInEnabled', false)
-    const disabled = await createServer()
-    addProtectedRoute(disabled)
-    await disabled.initialize()
+  test.each(['prod', null])(
+    'disabled mode keeps routes closed in environment %s',
+    async (environment) => {
+      config.set('auth.temporarySignInEnabled', false)
+      config.set('cdpEnvironment', environment)
+      config.set('isProduction', true)
+      config.set('serviceVersion', '1.0.0')
+      const disabled = await createServer()
+      addProtectedRoute(disabled)
+      await disabled.initialize()
 
-    try {
-      for (const url of ['/auth/sign-in', '/auth/sign-out', '/dev/identity']) {
-        expect((await disabled.inject(url)).statusCode).toBe(404)
+      try {
+        expect((await disabled.inject('/health')).statusCode).toBe(200)
+        for (const url of [
+          '/auth/sign-in',
+          '/auth/sign-out',
+          '/dev/identity'
+        ]) {
+          expect((await disabled.inject(url)).statusCode).toBe(404)
+        }
+        const response = await disabled.inject('/test/protected')
+        expect(response.statusCode).toBe(401)
+        expect(response.headers.location).toBeUndefined()
+      } finally {
+        await disabled.stop({ timeout: 0 })
       }
-      const response = await disabled.inject('/test/protected')
-      expect(response.statusCode).toBe(401)
-      expect(response.headers.location).toBeUndefined()
-    } finally {
-      await disabled.stop({ timeout: 0 })
     }
-  })
+  )
 
-  test.each([
-    ['isProduction', true],
-    ['serviceVersion', '1.0.0']
-  ])('blocks deployed enablement when %s is %s', async (key, value) => {
-    config.set(key, value)
-    await expect(createServer()).rejects.toThrow(
-      'Temporary sign-in is local-only'
-    )
-  })
+  test.each(['dev', 'test'])(
+    'allows sign-in and sign-out in %s with production runtime settings and a service version',
+    async (environment) => {
+      config.set('cdpEnvironment', environment)
+      config.set('isProduction', true)
+      config.set('serviceVersion', '1.0.0')
+      config.set('session.cookie.secure', true)
+      const deployed = await createServer()
+      await deployed.initialize()
+
+      try {
+        const login = await signIn({ returnTo: '/dev/identity' }, deployed)
+        expect(login.response.statusCode).toBe(303)
+        expect(login.response.headers.location).toBe('/dev/identity')
+        const cookie = login.response.headers['set-cookie'].find((value) =>
+          value.startsWith(`${authCookieName}=`)
+        )
+        expect(cookie).toContain('; Secure')
+        expect(cookie).toContain('; HttpOnly')
+        expect(cookie).toContain('SameSite=Strict')
+
+        const response = await deployed.inject({
+          url: '/dev/identity',
+          headers: { cookie: login.cookies }
+        })
+        expect(response.statusCode).toBe(200)
+        const $ = cheerio.load(response.payload)
+        expect(
+          $('main dd')
+            .map((_, element) => $(element).text().trim())
+            .get()
+        ).toEqual(['stub-user-1', 'Stub User', 'stub-org-1', 'temporary'])
+
+        const logout = await deployed.inject({
+          method: 'POST',
+          url: '/auth/sign-out',
+          headers: { cookie: login.cookies },
+          payload: { crumb: login.crumb }
+        })
+        expect(logout.statusCode).toBe(303)
+        const replay = await deployed.inject({
+          url: '/dev/identity',
+          headers: { cookie: login.cookies }
+        })
+        expect(replay.statusCode).toBe(302)
+      } finally {
+        await deployed.stop({ timeout: 0 })
+      }
+    }
+  )
+
+  test.each(['prod', null, '', 'development', 'perf-test'])(
+    'rejects enabled temporary sign-in in environment %j even in local runtime mode',
+    async (environment) => {
+      config.set('cdpEnvironment', environment)
+      await expect(createServer()).rejects.toThrow(
+        'Temporary sign-in requires ENVIRONMENT to be local, dev or test'
+      )
+    }
+  )
 
   test.each(['', '   ', ' padded-id '])(
     'rejects invalid configured organisation IDs: %j',

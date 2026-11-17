@@ -2,6 +2,8 @@ import Cookie from '@hapi/cookie'
 
 import { config } from '#/config/config.js'
 
+const temporarySignInEnvironments = ['local', 'dev', 'test']
+
 export const authentication = {
   plugin: {
     name: 'authentication',
@@ -11,10 +13,10 @@ export const authentication = {
 
       if (
         enabled &&
-        (config.get('isProduction') || config.get('serviceVersion') !== null)
+        !temporarySignInEnvironments.includes(config.get('cdpEnvironment'))
       ) {
         throw new Error(
-          'Temporary sign-in is local-only. Deployed enablement is blocked until the CDP environment guard is confirmed.'
+          'Temporary sign-in requires ENVIRONMENT to be local, dev or test. Production, missing and unrecognised environments are not permitted.'
         )
       }
 
@@ -101,7 +103,7 @@ export const authentication = {
       if (enabled) {
         server.ext('onPreStart', () => {
           server.logger.warn(
-            'Temporary sign-in is enabled: no identity provider is contacted. Enabled by the development scripts in package.json or TEMPORARY_SIGN_IN_ENABLED. Local test identities only; remove the script setting when implementing SSO.'
+            'Temporary sign-in is enabled: no identity provider is contacted. Enabled by the development scripts in package.json or TEMPORARY_SIGN_IN_ENABLED in deployment configuration. Synthetic test identities only; remove temporary sign-in settings when implementing SSO.'
           )
         })
       }

@@ -88,15 +88,15 @@ npm install
 
 ### Temporary sign-in
 
-Temporary sign-in is an authentication foundation for local development, not real
-identity verification. It is independent of backend selection and does not create
-notifications. The transport page and notification API integration are separate
-work.
+Temporary sign-in is an authentication foundation for local development and
+deployed dev/test environments, not real identity verification. It is independent
+of backend selection and does not create notifications. The transport page and
+notification API integration are separate work.
 
 Run `npm run dev` or `npm run dev:debug`. Both commands explicitly set
-`TEMPORARY_SIGN_IN_ENABLED=true`; no `.env` file is needed to enable it. A startup
-warning explains that no identity provider is contacted. These script-set values
-take precedence over `.env`. To run without temporary sign-in, use
+`ENVIRONMENT=local` and `TEMPORARY_SIGN_IN_ENABLED=true`; no `.env` file is needed
+to enable it. A startup warning explains that no identity provider is contacted.
+These script-set values take precedence over `.env`. To run without temporary sign-in, use
 `TEMPORARY_SIGN_IN_ENABLED=false npm run server:watch`.
 
 Visit <http://localhost:3000/dev/identity>. You will be redirected to a clearly
@@ -129,14 +129,47 @@ general session state. Session and cookie lifetimes use the existing
 Memory-backed sessions are lost when the frontend restarts. Session and
 authorization headers are redacted from default logs, including locally.
 
-**Shared deployments are intentionally not enabled yet.** Startup rejects
-temporary sign-in when `NODE_ENV=production` or CDP has injected a
-`SERVICE_VERSION`. Confirmation of the CDP deployment-environment identifier and
-an explicit dev/test allowlist is deferred; do not change deployed runtime
-settings to bypass this guard. Production runtime mode is not used to distinguish
-deployed dev/test from live: all deployed enablement remains blocked for now.
-With temporary sign-in disabled, its routes are absent and the authentication
-strategy denies unauthenticated protected requests rather than bypassing login.
+#### Deployed dev/test environments
+
+Temporary sign-in defaults to disabled. When enabled, the application requires
+`ENVIRONMENT` to be exactly `local`, `dev` or `test`. If it is `prod`, missing,
+empty or any other value, startup fails. Missing values are never assumed to mean
+local development.
+
+CDP supplies `ENVIRONMENT` through its
+[application-container deployment template](https://github.com/DEFRA/cdp-ecs-deployment-lambda/blob/main/templates/application_container.json).
+The application reads it centrally as `config.get('cdpEnvironment')`. This is
+separate from `NODE_ENV`: keep `NODE_ENV=production` and the injected
+`SERVICE_VERSION` unchanged in deployed dev/test. Production runtime settings,
+including secure cookies and Redis selection, remain in effect.
+
+To enable temporary sign-in for a deployment, raise a separate configuration PR
+in [cdp-app-config](https://github.com/DEFRA/cdp-app-config). Add:
+
+```env
+TEMPORARY_SIGN_IN_ENABLED=true
+```
+
+Only add this to the required service/environment file:
+
+- [Dev configuration](https://github.com/DEFRA/cdp-app-config/blob/main/services/trade-imports-fish-importer-fe/dev/trade-imports-fish-importer-fe.env)
+- [Test configuration](https://github.com/DEFRA/cdp-app-config/blob/main/services/trade-imports-fish-importer-fe/test/trade-imports-fish-importer-fe.env)
+
+Do not add it to the shared service defaults or production configuration. The
+frontend changes alone do not enable the flag in CDP. Deploy the application
+version supporting this guard, merge the approved configuration PR and redeploy
+through the CDP Portal for the flag to take effect.
+
+Reuse the deployment's existing `SESSION_COOKIE_PASSWORD` secret and Redis
+configuration; do not copy secret values into the configuration repo. After
+deployment, open `/dev/identity` on the service URL, sign in, verify the expected
+organisation ID, then sign out and confirm that revisiting the identity page
+requires sign-in again.
+
+With temporary sign-in disabled, its routes are absent in every environment and
+the authentication strategy denies unauthenticated protected requests rather
+than bypassing login. Disabling the flag and redeploying also prevents existing
+temporary sessions from authenticating.
 
 #### Using the authentication foundation
 

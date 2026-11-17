@@ -23,6 +23,13 @@ export const config = convict({
     default: null,
     env: 'SERVICE_VERSION'
   },
+  cdpEnvironment: {
+    doc: 'CDP deployment environment, or local when explicitly set by development commands',
+    format: String,
+    nullable: true,
+    default: null,
+    env: 'ENVIRONMENT'
+  },
   host: {
     doc: 'The IP address to bind',
     format: 'ipaddress',
@@ -117,7 +124,7 @@ export const config = convict({
   },
   auth: {
     temporarySignInEnabled: {
-      doc: 'Enable the local-only test-user sign-in. Deployed enablement is not yet supported.',
+      doc: 'Enable test-user sign-in only in the local, dev and test environments',
       format: Boolean,
       default: false,
       env: 'TEMPORARY_SIGN_IN_ENABLED'
