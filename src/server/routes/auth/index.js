@@ -14,9 +14,9 @@ const signInQuery = Joi.object({
 
 const optionalSession = { strategy: 'session', mode: 'try' }
 
-export const temporaryAuth = {
+export const testUserAuth = {
   plugin: {
-    name: 'temporary-auth-routes',
+    name: 'test-user-auth-routes',
     register(server) {
       server.route([
         {

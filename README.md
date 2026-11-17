@@ -12,7 +12,7 @@ Core delivery platform Node.js Frontend Template.
 - [Redis](#redis)
 - [Local Development](#local-development)
   - [Setup](#setup)
-  - [Temporary sign-in](#temporary-sign-in)
+  - [Test user sign-in](#test-user-sign-in)
   - [Signed Commits](#signed-commits)
   - [Development](#development)
   - [Production](#production)
@@ -86,21 +86,21 @@ Install application dependencies:
 npm install
 ```
 
-### Temporary sign-in
+### Test user sign-in
 
-Temporary sign-in is an authentication foundation for local development and
+Test user sign-in is an authentication mechanism for local development and
 deployed dev/test environments, not real identity verification. It is independent
 of backend selection and does not create notifications. The transport page and
 notification API integration are separate work.
 
 Run `npm run dev` or `npm run dev:debug`. Both commands explicitly set
-`ENVIRONMENT=local` and `TEMPORARY_SIGN_IN_ENABLED=true`; no `.env` file is needed
+`ENVIRONMENT=local` and `TEST_USER_SIGN_IN_ENABLED=true`; no `.env` file is needed
 to enable it. A startup warning explains that no identity provider is contacted.
-These script-set values take precedence over `.env`. To run without temporary sign-in, use
-`TEMPORARY_SIGN_IN_ENABLED=false npm run server:watch`.
+These script-set values take precedence over `.env`. To run without test user sign-in, use
+`TEST_USER_SIGN_IN_ENABLED=false npm run server:watch`.
 
 Visit <http://localhost:3000/dev/identity>. You will be redirected to a clearly
-labelled temporary sign-in page. Clicking **Continue as test user** submits a
+labelled test user sign-in page. Clicking **Continue as test user** submits a
 CSRF-protected POST and returns to the identity page, showing:
 
 | Field           | Default value |
@@ -108,7 +108,7 @@ CSRF-protected POST and returns to the identity page, showing:
 | User ID         | `stub-user-1` |
 | Name            | `Stub User`   |
 | Organisation ID | `stub-org-1`  |
-| Identity source | `temporary`   |
+| Identity source | `test-user`   |
 
 `TEST_ORGANISATION_ID` can override the non-secret organisation default, for
 example in your optional local `.env`. Agreement on a backend-accepted ID is part
@@ -129,9 +129,14 @@ general session state. Session and cookie lifetimes use the existing
 Memory-backed sessions are lost when the frontend restarts. Session and
 authorization headers are redacted from default logs, including locally.
 
+After updating from an earlier branch version, sign in again: cached sessions
+with the previous identity-source label are rejected. Any existing local or CDP
+opt-in configuration must use `TEST_USER_SIGN_IN_ENABLED`; previous flag names
+are not read.
+
 #### Deployed dev/test environments
 
-Temporary sign-in defaults to disabled. When enabled, the application requires
+Test user sign-in defaults to disabled. When enabled, the application requires
 `ENVIRONMENT` to be exactly `local`, `dev` or `test`. If it is `prod`, missing,
 empty or any other value, startup fails. Missing values are never assumed to mean
 local development.
@@ -143,11 +148,11 @@ separate from `NODE_ENV`: keep `NODE_ENV=production` and the injected
 `SERVICE_VERSION` unchanged in deployed dev/test. Production runtime settings,
 including secure cookies and Redis selection, remain in effect.
 
-To enable temporary sign-in for a deployment, raise a separate configuration PR
+To enable test user sign-in for a deployment, raise a separate configuration PR
 in [cdp-app-config](https://github.com/DEFRA/cdp-app-config). Add:
 
 ```env
-TEMPORARY_SIGN_IN_ENABLED=true
+TEST_USER_SIGN_IN_ENABLED=true
 ```
 
 Only add this to the required service/environment file:
@@ -166,10 +171,10 @@ deployment, open `/dev/identity` on the service URL, sign in, verify the expecte
 organisation ID, then sign out and confirm that revisiting the identity page
 requires sign-in again.
 
-With temporary sign-in disabled, its routes are absent in every environment and
+With test user sign-in disabled, its routes are absent in every environment and
 the authentication strategy denies unauthenticated protected requests rather
 than bypassing login. Disabling the flag and redeploying also prevents existing
-temporary sessions from authenticating.
+test user sessions from authenticating.
 
 #### Using the authentication foundation
 
@@ -203,16 +208,19 @@ POST `/auth/sign-in` establishes the identity. POST `/auth/sign-out` invalidates
 the cached identity and clears its cookie. Existing CSRF protection applies to
 both POSTs.
 
-The unlinked `/dev/identity` route is a temporary, non-cacheable verification page,
+The unlinked `/dev/identity` route is a non-cacheable development/test verification page,
 not part of the importer journey. It can be removed after verification without
 removing sign-in or the automated authentication tests.
 
-When implementing real DEFRA SSO, remove the hardcoded temporary-sign-in flag from
-**both** development commands in the same change. Replace temporary identity
-creation with verified SSO identity and organisation membership, preserve the
-credentials contract, invalidate temporary sessions, and remove temporary routes,
-fixtures and configuration. Verify the real local SSO round-trip; the startup
-warning is deliberately present to prevent silently bypassing it.
+When implementing real DEFRA SSO, retain test user sign-in as a separate,
+explicitly enabled development/testing option with the same production guard.
+Preserve the credentials contract, but obtain real user identity and organisation
+membership from verified SSO rather than the test identity. Keep identity sources
+distinct and invalidate test user sessions when switching to real SSO.
+Ensure the development commands and sign-in routing allow developers to exercise
+the real SSO flow without test user sign-in silently taking precedence. Verify
+the real local SSO round-trip; the startup warning must continue to identify when
+test user sign-in bypasses the identity provider.
 
 ### Signed Commits
 

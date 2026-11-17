@@ -28,10 +28,10 @@ function addProtectedRoute(server) {
   })
 }
 
-describe('Temporary authentication', () => {
+describe('Test user sign-in', () => {
   let server
   const originalConfig = {
-    enabled: config.get('auth.temporarySignInEnabled'),
+    enabled: config.get('auth.testUserSignInEnabled'),
     cdpEnvironment: config.get('cdpEnvironment'),
     organisationId: config.get('auth.testOrganisationId'),
     isProduction: config.get('isProduction'),
@@ -41,7 +41,7 @@ describe('Temporary authentication', () => {
   const authCookieName = `${config.get('serviceName')}_auth`
 
   function localConfig() {
-    config.set('auth.temporarySignInEnabled', true)
+    config.set('auth.testUserSignInEnabled', true)
     config.set('cdpEnvironment', 'local')
     config.set('auth.testOrganisationId', 'stub-org-1')
     config.set('isProduction', false)
@@ -64,7 +64,7 @@ describe('Temporary authentication', () => {
 
   afterAll(async () => {
     await server?.stop({ timeout: 0 })
-    config.set('auth.temporarySignInEnabled', originalConfig.enabled)
+    config.set('auth.testUserSignInEnabled', originalConfig.enabled)
     config.set('cdpEnvironment', originalConfig.cdpEnvironment)
     config.set('auth.testOrganisationId', originalConfig.organisationId)
     config.set('isProduction', originalConfig.isProduction)
@@ -149,6 +149,7 @@ describe('Temporary authentication', () => {
     const cacheSet = vi.spyOn(server.app.authCache, 'set')
 
     expect(response.statusCode).toBe(200)
+    expect($('main h1').text()).toBe('Test user sign-in')
     expect($('main form').attr('method')).toBe('post')
     expect($('main input[name="crumb"]').val()).toBeTruthy()
     expect($('main').text()).toContain('does not verify your identity')
@@ -186,7 +187,7 @@ describe('Temporary authentication', () => {
     expect(identity.result).toEqual({
       userId: 'stub-user-1',
       organisationId: 'configured-test-org',
-      identitySource: 'temporary'
+      identitySource: 'test-user'
     })
   })
 
@@ -205,11 +206,12 @@ describe('Temporary authentication', () => {
       .get()
 
     expect(response.statusCode).toBe(200)
+    expect($('main h1').text()).toBe('Test user sign-in identity')
     expect(values).toEqual([
       'stub-user-1',
       'Stub User',
       'stub-org-1',
-      'temporary'
+      'test-user'
     ])
     expect(response.headers['cache-control']).toBe('no-store')
     expect(response.payload).not.toContain(id)
@@ -365,9 +367,9 @@ describe('Temporary authentication', () => {
     expect(await server.app.authCache.get(id)).toBeNull()
   })
 
-  test('disabling temporary authentication also rejects existing temporary sessions', async () => {
+  test('disabling test user sign-in also rejects existing test user sessions', async () => {
     const login = await signIn()
-    config.set('auth.temporarySignInEnabled', false)
+    config.set('auth.testUserSignInEnabled', false)
 
     const response = await server.inject({
       url: '/test/protected',
@@ -381,7 +383,7 @@ describe('Temporary authentication', () => {
   test.each(['prod', null])(
     'disabled mode keeps routes closed in environment %s',
     async (environment) => {
-      config.set('auth.temporarySignInEnabled', false)
+      config.set('auth.testUserSignInEnabled', false)
       config.set('cdpEnvironment', environment)
       config.set('isProduction', true)
       config.set('serviceVersion', '1.0.0')
@@ -438,7 +440,7 @@ describe('Temporary authentication', () => {
           $('main dd')
             .map((_, element) => $(element).text().trim())
             .get()
-        ).toEqual(['stub-user-1', 'Stub User', 'stub-org-1', 'temporary'])
+        ).toEqual(['stub-user-1', 'Stub User', 'stub-org-1', 'test-user'])
 
         const logout = await deployed.inject({
           method: 'POST',
@@ -459,11 +461,11 @@ describe('Temporary authentication', () => {
   )
 
   test.each(['prod', null, '', 'development', 'perf-test'])(
-    'rejects enabled temporary sign-in in environment %j even in local runtime mode',
+    'rejects enabled test user sign-in in environment %j even in local runtime mode',
     async (environment) => {
       config.set('cdpEnvironment', environment)
       await expect(createServer()).rejects.toThrow(
-        'Temporary sign-in requires ENVIRONMENT to be local, dev or test'
+        'Test user sign-in requires ENVIRONMENT to be local, dev or test'
       )
     }
   )
@@ -476,7 +478,7 @@ describe('Temporary authentication', () => {
     }
   )
 
-  test('announces the temporary identity-provider bypass during startup', async () => {
+  test('announces the test user identity-provider bypass during startup', async () => {
     const instance = await createServer()
     const warn = vi.spyOn(instance.logger, 'warn')
 
@@ -484,7 +486,7 @@ describe('Temporary authentication', () => {
       await instance.initialize()
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          'Temporary sign-in is enabled: no identity provider is contacted.'
+          'Test user sign-in is enabled: no identity provider is contacted.'
         )
       )
     } finally {

@@ -2,21 +2,21 @@ import Cookie from '@hapi/cookie'
 
 import { config } from '#/config/config.js'
 
-const temporarySignInEnvironments = ['local', 'dev', 'test']
+const testUserSignInEnvironments = ['local', 'dev', 'test']
 
 export const authentication = {
   plugin: {
     name: 'authentication',
     async register(server) {
-      const enabled = config.get('auth.temporarySignInEnabled')
+      const enabled = config.get('auth.testUserSignInEnabled')
       const organisationId = config.get('auth.testOrganisationId')
 
       if (
         enabled &&
-        !temporarySignInEnvironments.includes(config.get('cdpEnvironment'))
+        !testUserSignInEnvironments.includes(config.get('cdpEnvironment'))
       ) {
         throw new Error(
-          'Temporary sign-in requires ENVIRONMENT to be local, dev or test. Production, missing and unrecognised environments are not permitted.'
+          'Test user sign-in requires ENVIRONMENT to be local, dev or test. Production, missing and unrecognised environments are not permitted.'
         )
       }
 
@@ -50,7 +50,7 @@ export const authentication = {
         },
         redirectTo(request) {
           if (
-            !config.get('auth.temporarySignInEnabled') ||
+            !config.get('auth.testUserSignInEnabled') ||
             request.method !== 'get'
           ) {
             return false
@@ -61,7 +61,7 @@ export const authentication = {
         },
         async validate(request, session) {
           if (
-            !config.get('auth.temporarySignInEnabled') ||
+            !config.get('auth.testUserSignInEnabled') ||
             typeof session.sessionId !== 'string'
           ) {
             return { isValid: false }
@@ -82,7 +82,7 @@ export const authentication = {
           }
 
           if (
-            credentials.identitySource !== 'temporary' ||
+            credentials.identitySource !== 'test-user' ||
             credentials.sessionId !== session.sessionId ||
             typeof credentials.userId !== 'string' ||
             !credentials.userId ||
@@ -90,7 +90,7 @@ export const authentication = {
             !credentials.organisationId.trim()
           ) {
             request.logger.warn(
-              'Rejecting invalid temporary authentication session'
+              'Rejecting invalid test user authentication session'
             )
             await server.app.authCache.drop(session.sessionId)
             return { isValid: false }
@@ -103,7 +103,7 @@ export const authentication = {
       if (enabled) {
         server.ext('onPreStart', () => {
           server.logger.warn(
-            'Temporary sign-in is enabled: no identity provider is contacted. Enabled by the development scripts in package.json or TEMPORARY_SIGN_IN_ENABLED in deployment configuration. Synthetic test identities only; remove temporary sign-in settings when implementing SSO.'
+            'Test user sign-in is enabled: no identity provider is contacted. Enabled by the development scripts in package.json or TEST_USER_SIGN_IN_ENABLED in deployment configuration. Synthetic test identities only; keep separate from the real SSO flow.'
           )
         })
       }

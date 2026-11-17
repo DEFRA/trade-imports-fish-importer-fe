@@ -6,7 +6,7 @@ export const authController = {
   signInPage(request, h) {
     return h
       .view('auth/sign-in', {
-        pageTitle: 'Temporary sign-in',
+        pageTitle: 'Test user sign-in',
         signInUrl: `/auth/sign-in?returnTo=${encodeURIComponent(request.query.returnTo)}`
       })
       .header('Cache-Control', 'no-store')
@@ -24,7 +24,7 @@ export const authController = {
       userId: 'stub-user-1',
       name: 'Stub User',
       organisationId: config.get('auth.testOrganisationId'),
-      identitySource: 'temporary'
+      identitySource: 'test-user'
     })
 
     request.cookieAuth.set({ sessionId })
@@ -45,7 +45,7 @@ export const authController = {
       request.auth.credentials
     return h
       .view('auth/identity', {
-        pageTitle: 'Temporary sign-in identity',
+        pageTitle: 'Test user sign-in identity',
         userId,
         name,
         organisationId,

@@ -123,14 +123,14 @@ export const config = convict({
     env: 'ENABLE_SECURE_CONTEXT'
   },
   auth: {
-    temporarySignInEnabled: {
-      doc: 'Enable test-user sign-in only in the local, dev and test environments',
+    testUserSignInEnabled: {
+      doc: 'Enable test user sign-in only in the local, dev and test environments',
       format: Boolean,
       default: false,
-      env: 'TEMPORARY_SIGN_IN_ENABLED'
+      env: 'TEST_USER_SIGN_IN_ENABLED'
     },
     testOrganisationId: {
-      doc: 'Synthetic organisation ID assigned server-side during temporary sign-in',
+      doc: 'Synthetic organisation ID assigned server-side during test user sign-in',
       format: String,
       default: 'stub-org-1',
       env: 'TEST_ORGANISATION_ID'
