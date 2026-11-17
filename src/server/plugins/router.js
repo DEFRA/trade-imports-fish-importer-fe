@@ -3,6 +3,7 @@ import inert from '@hapi/inert'
 import { home } from '../routes/home/index.js'
 import { about } from '../routes/about/index.js'
 import { guidance } from '../routes/notification/guidance/index.js'
+import { temporaryAuth } from '../routes/auth/index.js'
 import { health } from '../routes/health/index.js'
 import { cookies } from '../routes/cookies/controller.js'
 import { serveStaticFiles } from './serve-static-files.js'
@@ -20,6 +21,10 @@ export const router = {
 
       // Application specific routes, add your own routes here
       await server.register([home, about, guidance])
+
+      if (config.get('auth.temporarySignInEnabled')) {
+        await server.register(temporaryAuth)
+      }
 
       // Static assets
       if (!config.get('isProduction') && !config.get('isTest')) {

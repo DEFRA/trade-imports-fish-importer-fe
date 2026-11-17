@@ -16,6 +16,7 @@ import { contentSecurityPolicy } from './plugins/content-security-policy.js'
 import { metrics } from '@defra/cdp-metrics'
 import { cookieConsent } from '#/server/plugins/cookie-consent.js'
 import { csrf } from '#/server/plugins/csrf.js'
+import { authentication } from '#/server/plugins/authentication.js'
 
 export async function createServer() {
   const server = hapi.server({
@@ -62,6 +63,7 @@ export async function createServer() {
     pulse,
     contentSecurityPolicy,
     sessionCache,
+    authentication,
     nunjucksConfig,
     Scooter,
     csrf,

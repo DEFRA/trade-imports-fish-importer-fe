@@ -94,9 +94,11 @@ export const config = convict({
     redact: {
       doc: 'Log paths to redact',
       format: Array,
-      default: isProduction
-        ? ['req.headers.authorization', 'req.headers.cookie', 'res.headers']
-        : [],
+      default: [
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'res.headers'
+      ],
       env: 'LOG_REDACT'
     }
   },
@@ -112,6 +114,20 @@ export const config = convict({
     format: Boolean,
     default: isProduction,
     env: 'ENABLE_SECURE_CONTEXT'
+  },
+  auth: {
+    temporarySignInEnabled: {
+      doc: 'Enable the local-only test-user sign-in. Deployed enablement is not yet supported.',
+      format: Boolean,
+      default: false,
+      env: 'TEMPORARY_SIGN_IN_ENABLED'
+    },
+    testOrganisationId: {
+      doc: 'Synthetic organisation ID assigned server-side during temporary sign-in',
+      format: String,
+      default: 'stub-org-1',
+      env: 'TEST_ORGANISATION_ID'
+    }
   },
   session: {
     cache: {

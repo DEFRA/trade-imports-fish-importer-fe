@@ -12,6 +12,7 @@ Core delivery platform Node.js Frontend Template.
 - [Redis](#redis)
 - [Local Development](#local-development)
   - [Setup](#setup)
+  - [Temporary sign-in](#temporary-sign-in)
   - [Signed Commits](#signed-commits)
   - [Development](#development)
   - [Production](#production)
@@ -84,6 +85,101 @@ Install application dependencies:
 ```bash
 npm install
 ```
+
+### Temporary sign-in
+
+Temporary sign-in is an authentication foundation for local development, not real
+identity verification. It is independent of backend selection and does not create
+notifications. The transport page and notification API integration are separate
+work.
+
+Run `npm run dev` or `npm run dev:debug`. Both commands explicitly set
+`TEMPORARY_SIGN_IN_ENABLED=true`; no `.env` file is needed to enable it. A startup
+warning explains that no identity provider is contacted. These script-set values
+take precedence over `.env`. To run without temporary sign-in, use
+`TEMPORARY_SIGN_IN_ENABLED=false npm run server:watch`.
+
+Visit <http://localhost:3000/dev/identity>. You will be redirected to a clearly
+labelled temporary sign-in page. Clicking **Continue as test user** submits a
+CSRF-protected POST and returns to the identity page, showing:
+
+| Field           | Default value |
+| --------------- | ------------- |
+| User ID         | `stub-user-1` |
+| Name            | `Stub User`   |
+| Organisation ID | `stub-org-1`  |
+| Identity source | `temporary`   |
+
+`TEST_ORGANISATION_ID` can override the non-secret organisation default, for
+example in your optional local `.env`. Agreement on a backend-accepted ID is part
+of the later notification integration. The default alone does not create an
+organisation in the backend.
+
+The identity page reads the authenticated session, not the current configuration,
+and shows no tokens, cookies or session references. Its **Sign out** button also
+uses a CSRF-protected POST. Signing in again renews the session and invalidates
+the previous authenticated session. Separate browsers have separate sessions,
+even though they use the same test identity.
+
+Authentication uses `@hapi/cookie`. Its protected, HttpOnly, SameSite=Strict cookie
+contains only a random session reference. Identity is held in the existing
+memory/Redis cache under the `auth-sessions` segment. Yar remains unchanged for
+general session state. Session and cookie lifetimes use the existing
+`SESSION_CACHE_TTL` and `SESSION_COOKIE_TTL` settings (four hours by default).
+Memory-backed sessions are lost when the frontend restarts. Session and
+authorization headers are redacted from default logs, including locally.
+
+**Shared deployments are intentionally not enabled yet.** Startup rejects
+temporary sign-in when `NODE_ENV=production` or CDP has injected a
+`SERVICE_VERSION`. Confirmation of the CDP deployment-environment identifier and
+an explicit dev/test allowlist is deferred; do not change deployed runtime
+settings to bypass this guard. Production runtime mode is not used to distinguish
+deployed dev/test from live: all deployed enablement remains blocked for now.
+With temporary sign-in disabled, its routes are absent and the authentication
+strategy denies unauthenticated protected requests rather than bypassing login.
+
+#### Using the authentication foundation
+
+Home, guidance, health, cookie pages and assets remain public. Mark each route
+that handles organisation-owned data as requiring the `session` strategy:
+
+```js
+server.route({
+  method: 'GET',
+  path: '/your-protected-page',
+  options: { auth: 'session' },
+  handler(request, h) {
+    const { userId, organisationId, identitySource } = request.auth.credentials
+    return h.view('your-template', { userId, organisationId, identitySource })
+  }
+})
+```
+
+Authenticated credentials also include `name` and an internal `sessionId`; do not
+send the session reference to the browser or log it. Use the organisation from
+credentials when constructing backend requests, never an organisation ID from a
+form, URL or browser storage. The backend's authentication and authorisation
+contract must still be agreed; an organisation ID by itself is not proof of
+authority.
+
+Unauthenticated protected GETs redirect to
+`/auth/sign-in?returnTo=<encoded internal path>`. The return path is validated to
+prevent external redirects. Unauthenticated protected POSTs receive 401 rather
+than a redirect that would lose submitted data. GET sign-in displays a form only;
+POST `/auth/sign-in` establishes the identity. POST `/auth/sign-out` invalidates
+the cached identity and clears its cookie. Existing CSRF protection applies to
+both POSTs.
+
+The unlinked `/dev/identity` route is a temporary, non-cacheable verification page,
+not part of the importer journey. It can be removed after verification without
+removing sign-in or the automated authentication tests.
+
+When implementing real DEFRA SSO, remove the hardcoded temporary-sign-in flag from
+**both** development commands in the same change. Replace temporary identity
+creation with verified SSO identity and organisation membership, preserve the
+credentials contract, invalidate temporary sessions, and remove temporary routes,
+fixtures and configuration. Verify the real local SSO round-trip; the startup
+warning is deliberately present to prevent silently bypassing it.
 
 ### Signed Commits
 

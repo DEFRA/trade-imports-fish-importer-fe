@@ -1,0 +1,30 @@
+{% extends 'layouts/page.njk' %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+
+{% block content %}
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+      <h1 class="govuk-heading-l">{{ pageTitle }}</h1>
+      <p class="govuk-body">These values come from your authenticated server-side session. This is a local-only verification page and can be removed independently of sign-in.</p>
+
+      {{ govukSummaryList({
+        rows: [
+          { key: { text: "User ID" }, value: { text: userId } },
+          { key: { text: "Name" }, value: { text: name } },
+          { key: { text: "Organisation ID" }, value: { text: organisationId } },
+          { key: { text: "Identity source" }, value: { text: identitySource } }
+        ]
+      }) }}
+
+      <form action="/auth/sign-out" method="post">
+        <input type="hidden" name="crumb" value="{{ crumb }}">
+        {{ govukButton({
+          text: "Sign out",
+          classes: "govuk-button--secondary"
+        }) }}
+      </form>
+    </div>
+  </div>
+{% endblock %}

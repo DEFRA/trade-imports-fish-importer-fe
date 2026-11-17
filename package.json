@@ -10,8 +10,8 @@
   },
   "scripts": {
     "build:frontend": "vite build",
-    "dev": "AWS_EMF_ENVIRONMENT=Local npm run server:watch",
-    "dev:debug": "AWS_EMF_ENVIRONMENT=Local npm run server:debug",
+    "dev": "AWS_EMF_ENVIRONMENT=Local TEMPORARY_SIGN_IN_ENABLED=true npm run server:watch",
+    "dev:debug": "AWS_EMF_ENVIRONMENT=Local TEMPORARY_SIGN_IN_ENABLED=true npm run server:debug",
     "docker:dev": "npm run dev",
     "format": "prettier --write \"src/**/*.js\" \"**/*.{js,cjs,md,json,config.js,test.js}\"",
     "format:check": "prettier --check \"src/**/*.js\" \"**/*.{js,cjs,md,json,config.js,test.js}\"",
@@ -43,6 +43,7 @@
     "@elastic/ecs-pino-format": "1.5.0",
     "@hapi/catbox-memory": "6.0.2",
     "@hapi/catbox-redis": "7.1.0",
+    "@hapi/cookie": "12.0.1",
     "@hapi/crumb": "9.0.1",
     "@hapi/hapi": "21.4.10",
     "@hapi/inert": "7.1.2",

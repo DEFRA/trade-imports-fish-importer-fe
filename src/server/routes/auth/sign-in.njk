@@ -1,0 +1,25 @@
+{% extends 'layouts/page.njk' %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+
+{% block content %}
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+      <h1 class="govuk-heading-l">{{ pageTitle }}</h1>
+
+      {{ govukInsetText({
+        text: "Local development only. Temporary sign-in does not verify your identity or contact an identity provider."
+      }) }}
+
+      <p class="govuk-body">Continue using the predefined test user. Use synthetic data only.</p>
+
+      <form action="{{ signInUrl }}" method="post">
+        <input type="hidden" name="crumb" value="{{ crumb }}">
+        {{ govukButton({
+          text: "Continue as test user"
+        }) }}
+      </form>
+    </div>
+  </div>
+{% endblock %}
