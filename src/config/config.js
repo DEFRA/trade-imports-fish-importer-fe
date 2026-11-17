@@ -23,6 +23,13 @@ export const config = convict({
     default: null,
     env: 'SERVICE_VERSION'
   },
+  cdpEnvironment: {
+    doc: 'CDP deployment environment, or local when explicitly set by development commands',
+    format: String,
+    nullable: true,
+    default: null,
+    env: 'ENVIRONMENT'
+  },
   host: {
     doc: 'The IP address to bind',
     format: 'ipaddress',
@@ -94,9 +101,11 @@ export const config = convict({
     redact: {
       doc: 'Log paths to redact',
       format: Array,
-      default: isProduction
-        ? ['req.headers.authorization', 'req.headers.cookie', 'res.headers']
-        : [],
+      default: [
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'res.headers'
+      ],
       env: 'LOG_REDACT'
     }
   },
@@ -112,6 +121,14 @@ export const config = convict({
     format: Boolean,
     default: isProduction,
     env: 'ENABLE_SECURE_CONTEXT'
+  },
+  auth: {
+    testUserSignInEnabled: {
+      doc: 'Enable test user sign-in only in the local, dev and test environments',
+      format: Boolean,
+      default: false,
+      env: 'TEST_USER_SIGN_IN_ENABLED'
+    }
   },
   session: {
     cache: {

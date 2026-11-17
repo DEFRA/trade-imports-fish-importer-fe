@@ -10,10 +10,13 @@
 // - Starts with "/" (relative to the current origin)
 // - Does NOT start with "//" (protocol-relative URL, which would navigate
 //   to an external domain)
+// - Contains no backslashes or control characters that browsers can normalise
 
 export function isSafeRedirect(url) {
   if (!url || typeof url !== 'string') {
     return false
   }
-  return url.startsWith('/') && !url.startsWith('//')
+  return (
+    url.startsWith('/') && !url.startsWith('//') && !/[\\\p{Cc}]/u.test(url)
+  )
 }

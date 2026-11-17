@@ -18,6 +18,14 @@ describe('isSafeRedirect', () => {
     expect(isSafeRedirect('//evil.example.com')).toBe(false)
   })
 
+  test.each([
+    '/\\evil.example.com',
+    '/\t/evil.example.com',
+    '/\n/evil.example.com'
+  ])('rejects browser-normalised external redirects: %j', (url) => {
+    expect(isSafeRedirect(url)).toBe(false)
+  })
+
   test('returns false for null', () => {
     expect(isSafeRedirect(null)).toBe(false)
   })
