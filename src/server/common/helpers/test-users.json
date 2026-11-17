@@ -1,0 +1,20 @@
+[
+  {
+    "userId": "test-user-001",
+    "name": "Importer Oak",
+    "organisationId": "test-org-001",
+    "organisationName": "Example Harbour Imports"
+  },
+  {
+    "userId": "test-user-002",
+    "name": "Importer Sycamore",
+    "organisationId": "test-org-001",
+    "organisationName": "Example Harbour Imports"
+  },
+  {
+    "userId": "test-user-003",
+    "name": "Importer Elm",
+    "organisationId": "test-org-002",
+    "organisationName": "Example Coastal Imports"
+  }
+]

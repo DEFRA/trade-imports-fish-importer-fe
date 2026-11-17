@@ -12,6 +12,7 @@ Core delivery platform Node.js Frontend Template.
 - [Redis](#redis)
 - [Local Development](#local-development)
   - [Setup](#setup)
+  - [Test user sign-in](#test-user-sign-in)
   - [Signed Commits](#signed-commits)
   - [Development](#development)
   - [Production](#production)
@@ -84,6 +85,178 @@ Install application dependencies:
 ```bash
 npm install
 ```
+
+### Test user sign-in
+
+Test user sign-in is an authentication mechanism for local development and
+deployed dev/test environments, not real identity verification. It is independent
+of backend selection and does not create notifications. The transport page and
+notification API integration are separate work.
+
+Run `npm run dev` or `npm run dev:debug`. Both commands explicitly set
+`ENVIRONMENT=local` and `TEST_USER_SIGN_IN_ENABLED=true`; no `.env` file is needed
+to enable it. A startup warning explains that no identity provider is contacted.
+These script-set values take precedence over `.env`. To run without test user sign-in, use
+`TEST_USER_SIGN_IN_ENABLED=false npm run server:watch`. Application pages remain
+protected and return 401 while no authentication provider is enabled.
+
+Visit <http://localhost:3000/> or a direct link to an application page. You will
+be redirected to a clearly labelled test user sign-in page. Choose a user from
+the GOV.UK radio buttons and click **Continue** to submit a CSRF-protected POST
+and return to the requested page. No user is preselected. Missing or unknown
+selections return HTTP 400 with a GOV.UK error summary and inline error, without
+changing any existing authentication session.
+
+The predefined synthetic identities are:
+
+| Name              | User ID         | Organisation            | Organisation ID |
+| ----------------- | --------------- | ----------------------- | --------------- |
+| Importer Oak      | `test-user-001` | Example Harbour Imports | `test-org-001`  |
+| Importer Sycamore | `test-user-002` | Example Harbour Imports | `test-org-001`  |
+| Importer Elm      | `test-user-003` | Example Coastal Imports | `test-org-002`  |
+
+Edit the server-only [test user catalogue](src/server/common/helpers/test-users.json)
+to change these identities, then restart/redeploy the frontend. The catalogue
+is loaded once and validated at startup when test user sign-in is enabled.
+User IDs must be unique, all fields must be non-empty strings without surrounding
+whitespace, and an organisation ID must have a consistent organisation name.
+Invalid catalogue data rejects startup instead of selecting a fallback identity.
+Keep this fixture synthetic and outside public assets or client-side imports.
+
+The browser submits only the selected test user ID; the server looks up its
+identity and organisation. Additional identity fields from the browser are
+rejected. `TEST_ORGANISATION_ID` and `auth.testOrganisationId` have been removed:
+previous overrides are no longer read. Organisation assignment comes only from
+the catalogue. Backend identifier requirements are separate notification
+integration work; sign-in does not create users, organisations or notifications
+in the backend.
+
+The unlinked <http://localhost:3000/dev/identity> verification page shows the
+selected user's ID, name, organisation name and ID, and identity source
+`test-user` from the cached session. It shows no tokens, cookies or session
+references. Its **Sign out** button uses a CSRF-protected POST. To switch users,
+sign out there and choose another user. There is no header sign-out control.
+Signing in again renews the session and invalidates the previous authenticated
+session. Separate browsers have independent sessions and can select different
+users, or the same user, without affecting one another.
+
+Each authenticated request checks that the cached user is still in the catalogue
+and has the same organisation ID. Removed users or changed organisation
+assignments invalidate only that authentication session; users must sign in
+again. Display-name-only changes do not force logout: cached labels remain a
+snapshot until the next sign-in.
+
+Authentication uses `@hapi/cookie`. Its protected, HttpOnly, SameSite=Strict cookie
+contains only a random session reference. Identity is held in the existing
+memory/Redis cache under the `auth-sessions` segment. Yar remains unchanged for
+general session state. Session and cookie lifetimes use the existing
+`SESSION_CACHE_TTL` and `SESSION_COOKIE_TTL` settings (four hours by default).
+Memory-backed sessions are lost when the frontend restarts. Session and
+authorization headers are redacted from default logs, including locally.
+
+Sessions using the previous single-user ID `stub-user-1` no longer match the
+catalogue and require sign-in again on their next authenticated request. Cached
+sessions with an earlier identity-source label are also rejected. This is normal
+session validation, not a migration or Redis flush; unrelated session data is
+unchanged. Any existing local or CDP opt-in configuration must use
+`TEST_USER_SIGN_IN_ENABLED`; previous flag names are not read.
+
+#### Deployed dev/test environments
+
+Test user sign-in defaults to disabled. When enabled, the application requires
+`ENVIRONMENT` to be exactly `local`, `dev` or `test`. If it is `prod`, missing,
+empty or any other value, startup fails. Missing values are never assumed to mean
+local development.
+
+CDP supplies `ENVIRONMENT` through its
+[application-container deployment template](https://github.com/DEFRA/cdp-ecs-deployment-lambda/blob/main/templates/application_container.json).
+The application reads it centrally as `config.get('cdpEnvironment')`. This is
+separate from `NODE_ENV`: keep `NODE_ENV=production` and the injected
+`SERVICE_VERSION` unchanged in deployed dev/test. Production runtime settings,
+including secure cookies and Redis selection, remain in effect.
+
+To enable test user sign-in for a deployment, raise a separate configuration PR
+in [cdp-app-config](https://github.com/DEFRA/cdp-app-config). Add:
+
+```env
+TEST_USER_SIGN_IN_ENABLED=true
+```
+
+Only add this to the required service/environment file:
+
+- [Dev configuration](https://github.com/DEFRA/cdp-app-config/blob/main/services/trade-imports-fish-importer-fe/dev/trade-imports-fish-importer-fe.env)
+- [Test configuration](https://github.com/DEFRA/cdp-app-config/blob/main/services/trade-imports-fish-importer-fe/test/trade-imports-fish-importer-fe.env)
+
+Do not add it to the shared service defaults or production configuration. The
+frontend changes alone do not enable the flag in CDP. Deploy the application
+version supporting this guard, merge the approved configuration PR and redeploy
+through the CDP Portal for the flag to take effect.
+
+Reuse the deployment's existing `SESSION_COOKIE_PASSWORD` secret and Redis
+configuration; do not copy secret values into the configuration repo. After
+deployment, open `/dev/identity` on the service URL, sign in, verify the expected
+organisation ID for each of the three users, then sign out and confirm that
+revisiting the identity page requires sign-in again. Local memory-backed checks
+do not verify the deployment's Redis connectivity.
+
+With test user sign-in disabled, its routes are absent in every environment and
+the authentication strategy denies unauthenticated protected requests rather
+than bypassing login. Disabling the flag and redeploying also prevents existing
+test user sessions from authenticating.
+
+#### Using the authentication foundation
+
+Application routes require the `session` strategy by default, including home
+and about. New routes inherit this protection without
+needing an explicit `auth` option:
+
+```js
+server.route({
+  method: 'GET',
+  path: '/your-protected-page',
+  handler(request, h) {
+    const { userId, organisationId, identitySource } = request.auth.credentials
+    return h.view('your-template', { userId, organisationId, identitySource })
+  }
+})
+```
+
+Sign-in routes explicitly allow anonymous access. Health checks, cookie policy
+and consent updates, favicon and static assets remain public; public routes must
+explicitly opt out with `auth: false`. Keep routes handling organisation-owned
+data protected. Disabling test user sign-in does not make application pages
+public: until another authentication provider is implemented, they return 401.
+
+Authenticated credentials also include `name`, `organisationName` and an internal
+`sessionId`; do not send the session reference to the browser or log it. Use the organisation from
+credentials when constructing backend requests, never an organisation ID from a
+form, URL or browser storage. The backend's authentication and authorisation
+contract must still be agreed; an organisation ID by itself is not proof of
+authority.
+
+Unauthenticated protected GETs redirect to
+`/auth/sign-in?returnTo=<encoded internal path>`. The return path is validated to
+prevent external redirects. Unauthenticated protected POSTs receive 401 rather
+than a redirect that would lose submitted data. GET sign-in displays a form only;
+POST `/auth/sign-in` establishes the identity. POST `/auth/sign-out` invalidates
+the cached identity and clears its cookie. Existing CSRF protection applies to
+both POSTs.
+
+The unlinked `/dev/identity` route is a non-cacheable development/test verification
+page, not part of the importer journey. It requires a session and is registered
+only when test user sign-in is enabled in `local`, `dev` or `test`; it is not
+available merely because the environment is dev/test. Retain it as the current
+sign-out location until a separate navigation change is agreed.
+
+When implementing real DEFRA SSO, retain test user sign-in as a separate,
+explicitly enabled development/testing option with the same production guard.
+Preserve the credentials contract, but obtain real user identity and organisation
+membership from verified SSO rather than the test identity. Keep identity sources
+distinct and invalidate test user sessions when switching to real SSO.
+Ensure the development commands and sign-in routing allow developers to exercise
+the real SSO flow without test user sign-in silently taking precedence. Verify
+the real local SSO round-trip; the startup warning must continue to identify when
+test user sign-in bypasses the identity provider.
 
 ### Signed Commits
 

@@ -16,7 +16,11 @@ describe('#aboutController', () => {
   test('Should provide expected response', async () => {
     const { result, statusCode } = await server.inject({
       method: 'GET',
-      url: '/about'
+      url: '/about',
+      auth: {
+        strategy: 'session',
+        credentials: { userId: 'test-user-001', organisationId: 'test-org-001' }
+      }
     })
 
     expect(result).toEqual(expect.stringContaining('About |'))
