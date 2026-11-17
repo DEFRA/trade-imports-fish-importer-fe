@@ -99,11 +99,15 @@ describe('#guidanceController', () => {
     })
     const $ = cheerio.load(result)
     const backLink = $('a.govuk-back-link')
+    const relatedContent = $('aside ul')
 
     expect(backLink.text().trim()).toBe('Back')
     expect(backLink.attr('href')).toBe('/')
+    expect($('aside').hasClass('app-related-items')).toBe(true)
+    expect(relatedContent.hasClass('govuk-list--spaced')).toBe(true)
     expect(
-      $('aside nav a')
+      relatedContent
+        .find('a')
         .map((_, element) => $(element).text().trim())
         .get()
     ).toEqual([

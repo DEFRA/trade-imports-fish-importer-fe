@@ -1,0 +1,8 @@
+@use "govuk-frontend" as *;
+
+// Matches the GOV.UK related content sidebar, which is not part of GOV.UK Frontend
+
+.app-related-items {
+  border-top: 2px solid govuk-functional-colour(brand);
+  padding-top: govuk-spacing(3);
+}
