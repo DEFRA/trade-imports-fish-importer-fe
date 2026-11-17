@@ -6,6 +6,7 @@ For setup basics see the [repository README](https://github.com/DEFRA/trade-impo
 | --------------------------------------------------------- | ---------------------------------------------------------------- |
 | [Server startup and plugins](server-startup.md)           | Entry point, `createServer()`, plugin order, error handler       |
 | [Routes](routes.md)                                       | Route table, route module layout, static assets                  |
+| [Notification journey](notification-journey.md)           | Transport details page, draft session, notification API client   |
 | [Configuration](configuration.md)                         | All config keys, environment variables, and defaults             |
 | [Sessions and caching](sessions-and-caching.md)           | Yar session, Catbox engines, Redis client                        |
 | [Cookie consent](cookie-consent.md)                       | Consent cookie, banner, `/cookies` routes, client-side behaviour |

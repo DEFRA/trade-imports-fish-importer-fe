@@ -46,6 +46,12 @@ export const config = convict({
     format: String,
     default: 'trade-imports-fish-importer-fe'
   },
+  notificationApiUrl: {
+    doc: 'Base URL for the fish notification backend',
+    format: 'url',
+    default: 'http://localhost:8085',
+    env: 'NOTIFICATION_API_URL'
+  },
   root: {
     doc: 'Project root',
     format: String,

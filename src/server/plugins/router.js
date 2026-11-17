@@ -6,6 +6,7 @@ import { health } from '../routes/health/index.js'
 import { cookies } from '../routes/cookies/controller.js'
 import { serveStaticFiles } from './serve-static-files.js'
 import { config } from '#/config/config.js'
+import { transportDetails } from '../routes/notification/transport-details/index.js'
 
 export const router = {
   plugin: {
@@ -18,7 +19,7 @@ export const router = {
       await server.register([cookies])
 
       // Application specific routes, add your own routes here
-      await server.register([home, about])
+      await server.register([home, about, transportDetails])
 
       // Static assets
       if (!config.get('isProduction') && !config.get('isTest')) {

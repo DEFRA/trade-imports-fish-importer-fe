@@ -4,17 +4,18 @@
 
 ## Server and assets
 
-| Environment variable     | Default                                 | Purpose                                                                                      |
-| ------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `NODE_ENV`               | Not set by config                       | Selects environment-dependent defaults.                                                      |
-| `HOST`                   | `0.0.0.0`                               | Bind address.                                                                                |
-| `PORT`                   | `3000`                                  | Bind port.                                                                                   |
-| `SERVICE_VERSION`        | `null`                                  | Version included in ECS log configuration.                                                   |
-| `ASSET_PATH`             | `/public`                               | Template asset prefix and production/test static route.                                      |
-| `STATIC_CACHE_TIMEOUT`   | `604800000`                             | Static route cache lifetime, one week.                                                       |
-| `ENABLE_SECURE_CONTEXT`  | `true` in production, otherwise `false` | Exposed as a config value, but not used to conditionally register the secure-context plugin. |
-| `HTTP_PROXY`             | `null`                                  | HTTP proxy configuration value.                                                              |
-| `GOOGLE_TAG_MANAGER_KEY` | Empty string                            | Tag Manager container ID; see [Cookie consent](cookie-consent.md).                           |
+| Environment variable     | Default                                 | Purpose                                                                                         |
+| ------------------------ | --------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `NODE_ENV`               | Not set by config                       | Selects environment-dependent defaults.                                                         |
+| `HOST`                   | `0.0.0.0`                               | Bind address.                                                                                   |
+| `PORT`                   | `3000`                                  | Bind port.                                                                                      |
+| `SERVICE_VERSION`        | `null`                                  | Version included in ECS log configuration.                                                      |
+| `ASSET_PATH`             | `/public`                               | Template asset prefix and production/test static route.                                         |
+| `STATIC_CACHE_TIMEOUT`   | `604800000`                             | Static route cache lifetime, one week.                                                          |
+| `ENABLE_SECURE_CONTEXT`  | `true` in production, otherwise `false` | Exposed as a config value, but not used to conditionally register the secure-context plugin.    |
+| `HTTP_PROXY`             | `null`                                  | HTTP proxy configuration value.                                                                 |
+| `NOTIFICATION_API_URL`   | `http://localhost:8085`                 | Base URL of the fish notification backend; see [Notification journey](notification-journey.md). |
+| `GOOGLE_TAG_MANAGER_KEY` | Empty string                            | Tag Manager container ID; see [Cookie consent](cookie-consent.md).                              |
 
 The service name is fixed in configuration as `trade-imports-fish-importer-fe`. Config exposes `HTTP_PROXY`; the application code does not itself configure an outbound HTTP client with this value.
 
