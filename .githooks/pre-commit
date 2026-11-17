@@ -1,0 +1,4 @@
+#!/bin/sh
+
+sh scripts/update-docs.sh || exit $?
+npm run git:pre-commit-hook
