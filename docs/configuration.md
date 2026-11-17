@@ -1,0 +1,40 @@
+# Configuration
+
+[`src/config/config.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/config/config.js) defines and validates configuration with Convict. Production, development and test defaults are determined by exact `NODE_ENV` values. Times below are in milliseconds.
+
+## Server and assets
+
+| Environment variable     | Default                                 | Purpose                                                                                      |
+| ------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `NODE_ENV`               | Not set by config                       | Selects environment-dependent defaults.                                                      |
+| `HOST`                   | `0.0.0.0`                               | Bind address.                                                                                |
+| `PORT`                   | `3000`                                  | Bind port.                                                                                   |
+| `SERVICE_VERSION`        | `null`                                  | Version included in ECS log configuration.                                                   |
+| `ASSET_PATH`             | `/public`                               | Template asset prefix and production/test static route.                                      |
+| `STATIC_CACHE_TIMEOUT`   | `604800000`                             | Static route cache lifetime, one week.                                                       |
+| `ENABLE_SECURE_CONTEXT`  | `true` in production, otherwise `false` | Exposed as a config value, but not used to conditionally register the secure-context plugin. |
+| `HTTP_PROXY`             | `null`                                  | HTTP proxy configuration value.                                                              |
+| `GOOGLE_TAG_MANAGER_KEY` | Empty string                            | Tag Manager container ID; see [Cookie consent](cookie-consent.md).                           |
+
+The service name is fixed in configuration as `trade-imports-fish-importer-fe`. Config exposes `HTTP_PROXY`; the application code does not itself configure an outbound HTTP client with this value.
+
+Logging and tracing settings are described in [Logging and observability](logging-and-observability.md).
+
+## Sessions and Redis
+
+| Environment variable        | Default                                   | Purpose                                                                  |
+| --------------------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
+| `SESSION_CACHE_ENGINE`      | `redis` in production, otherwise `memory` | Cache engine; allowed values are `redis` and `memory`.                   |
+| `SESSION_CACHE_NAME`        | `session`                                 | Named Catbox cache and Yar session name.                                 |
+| `SESSION_CACHE_TTL`         | `14400000`                                | Cache expiry, four hours.                                                |
+| `SESSION_COOKIE_TTL`        | `14400000`                                | Session cookie expiry, four hours.                                       |
+| `SESSION_COOKIE_PASSWORD`   | Development placeholder in config         | Yar cookie encryption password; supply a suitable secret for deployment. |
+| `SESSION_COOKIE_SECURE`     | `true` in production, otherwise `false`   | Session cookie secure flag.                                              |
+| `REDIS_HOST`                | `127.0.0.1`                               | Redis host.                                                              |
+| `REDIS_USERNAME`            | Empty string                              | Redis username; credentials are passed when this is nonempty.            |
+| `REDIS_PASSWORD`            | Empty string                              | Redis password.                                                          |
+| `REDIS_KEY_PREFIX`          | `trade-imports-fish-importer-fe:`         | Redis key prefix.                                                        |
+| `USE_SINGLE_INSTANCE_CACHE` | `false` in production, otherwise `true`   | Use a single Redis instance rather than a cluster.                       |
+| `REDIS_TLS`                 | `true` in production, otherwise `false`   | Enable Redis TLS.                                                        |
+
+`SESSION_CACHE_ENGINE=false` is not a supported value. See [Sessions and caching](sessions-and-caching.md) for cache behavior.

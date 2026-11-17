@@ -1,0 +1,10 @@
+site_name: FIS Importer Frontend - Documentation
+site_dir: _site
+ 
+theme:
+  name: material
+ 
+  palette:
+    scheme: default
+    primary: green
+    accent: green
