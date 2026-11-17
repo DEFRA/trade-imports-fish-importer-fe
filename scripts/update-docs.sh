@@ -44,9 +44,10 @@ ${NON_DOC_CHANGES}"
 
 PERMISSIONS_DIR=$(mktemp -d)
 trap 'rm -rf "$PERMISSIONS_DIR"' EXIT HUP INT TERM
+REPO_ROOT=$(git rev-parse --show-toplevel)
 copilot --config-dir="$PERMISSIONS_DIR" -p "$PROMPT" -s \
   --available-tools='view,glob,grep,edit,create' \
-  --allow-tool='read, write(docs/)' \
+  --allow-tool="read, write(${REPO_ROOT}/docs/**)" \
   --deny-tool='shell'
 
 if [ -n "$(git status --porcelain -- docs)" ]; then
