@@ -138,17 +138,6 @@ deployed dev/test from live: all deployed enablement remains blocked for now.
 With temporary sign-in disabled, its routes are absent and the authentication
 strategy denies unauthenticated protected requests rather than bypassing login.
 
-To verify CDP's environment value before changing the deployment guard, visit
-`/dev/environment` on the deployed frontend (or
-<http://localhost:3000/dev/environment> locally). This temporary, unlinked,
-read-only page is public, including when temporary sign-in is disabled. It shows
-only the running process's `ENVIRONMENT` value, or **Not set** if missing or empty;
-it does not assume `local` or infer the value from `NODE_ENV` or request inputs.
-No other environment variables, credentials or session data are displayed, and
-the response is not cacheable. Remove the diagnostic route once verification is
-complete. Adding this page does not enable temporary sign-in in deployed
-environments.
-
 #### Using the authentication foundation
 
 Home, guidance, health, cookie pages and assets remain public. Mark each route

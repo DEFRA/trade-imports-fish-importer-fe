@@ -4,7 +4,6 @@ import { home } from '../routes/home/index.js'
 import { about } from '../routes/about/index.js'
 import { guidance } from '../routes/notification/guidance/index.js'
 import { temporaryAuth } from '../routes/auth/index.js'
-import { environment } from '../routes/dev/environment.js'
 import { health } from '../routes/health/index.js'
 import { cookies } from '../routes/cookies/controller.js'
 import { serveStaticFiles } from './serve-static-files.js'
@@ -21,7 +20,7 @@ export const router = {
       await server.register([cookies])
 
       // Application specific routes, add your own routes here
-      await server.register([home, about, guidance, environment])
+      await server.register([home, about, guidance])
 
       if (config.get('auth.temporarySignInEnabled')) {
         await server.register(temporaryAuth)
