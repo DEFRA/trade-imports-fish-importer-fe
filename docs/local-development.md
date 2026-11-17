@@ -22,6 +22,12 @@ Other useful commands:
 
 Production defaults use a Redis cluster, TLS and secure session cookies. For local production-mode testing, configure a suitable Redis instance and cookie settings, or explicitly select memory for a single local process. Memory is not appropriate for a shared production deployment; see [Sessions and caching](sessions-and-caching.md). For container and release workflows, see [Deployment](deployment.md).
 
+## Git hooks
+
+The repository uses native Git hooks from `.githooks`. The `prepare` script in `package.json` runs `git config core.hooksPath .githooks` during `npm install`; outside a Git repository it exits without failing the install.
+
+The `pre-commit` hook runs `scripts/update-docs.sh` and then `npm run git:pre-commit-hook` (security audit, format check, lint and tests). When non-documentation changes are staged, `update-docs.sh` requires the Copilot CLI (`copilot`) and one of `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN`, and refuses to run while tracked files have unstaged changes.
+
 ## Documentation site
 
 `mkdocs.yml` configures the MkDocs Material site and `docs/` supplies its pages. The documentation workflow in `.github/workflows/build-docs.yml` installs `mkdocs-material==9.8.1` and runs `mkdocs build --strict`; it builds on relevant pull requests and deploys for non-pull-request runs. See [Deployment](deployment.md).

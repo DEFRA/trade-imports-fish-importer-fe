@@ -35,7 +35,6 @@ updates:
 
       tools:
         patterns:
-          - 'husky'
           - 'vitest'
           - 'vitest-*'
           - 'nodemon'
