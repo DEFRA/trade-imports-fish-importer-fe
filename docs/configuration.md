@@ -20,21 +20,40 @@ The service name is fixed in configuration as `trade-imports-fish-importer-fe`. 
 
 Logging and tracing settings are described in [Logging and observability](logging-and-observability.md).
 
+## Test user sign-in
+
+| Environment variable        | Default | Purpose                                                                                |
+| --------------------------- | ------- | -------------------------------------------------------------------------------------- |
+| `ENVIRONMENT`               | `null`  | CDP environment, exposed as `cdpEnvironment`.                                          |
+| `TEST_USER_SIGN_IN_ENABLED` | `false` | Enables the synthetic identity provider and its sign-in, sign-out and identity routes. |
+
+When test user sign-in is enabled, `ENVIRONMENT` must be exactly `local`, `dev`
+or `test`; production, missing, empty and unknown values reject startup.
+`NODE_ENV=production` remains valid for deployed dev/test and continues to
+control secure-cookie and Redis defaults, not permission to enable test sign-in.
+The development scripts explicitly set `ENVIRONMENT=local` and
+`TEST_USER_SIGN_IN_ENABLED=true`.
+
+Identities and organisation assignments come from the validated server-side JSON
+catalogue. The former `TEST_ORGANISATION_ID` override is no longer read.
+See [Local development](local-development.md) and
+[Sessions and caching](sessions-and-caching.md).
+
 ## Sessions and Redis
 
-| Environment variable        | Default                                   | Purpose                                                                  |
-| --------------------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
-| `SESSION_CACHE_ENGINE`      | `redis` in production, otherwise `memory` | Cache engine; allowed values are `redis` and `memory`.                   |
-| `SESSION_CACHE_NAME`        | `session`                                 | Named Catbox cache and Yar session name.                                 |
-| `SESSION_CACHE_TTL`         | `14400000`                                | Cache expiry, four hours.                                                |
-| `SESSION_COOKIE_TTL`        | `14400000`                                | Session cookie expiry, four hours.                                       |
-| `SESSION_COOKIE_PASSWORD`   | Development placeholder in config         | Yar cookie encryption password; supply a suitable secret for deployment. |
-| `SESSION_COOKIE_SECURE`     | `true` in production, otherwise `false`   | Session cookie secure flag.                                              |
-| `REDIS_HOST`                | `127.0.0.1`                               | Redis host.                                                              |
-| `REDIS_USERNAME`            | Empty string                              | Redis username; credentials are passed when this is nonempty.            |
-| `REDIS_PASSWORD`            | Empty string                              | Redis password.                                                          |
-| `REDIS_KEY_PREFIX`          | `trade-imports-fish-importer-fe:`         | Redis key prefix.                                                        |
-| `USE_SINGLE_INSTANCE_CACHE` | `false` in production, otherwise `true`   | Use a single Redis instance rather than a cluster.                       |
-| `REDIS_TLS`                 | `true` in production, otherwise `false`   | Enable Redis TLS.                                                        |
+| Environment variable        | Default                                   | Purpose                                                                            |
+| --------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| `SESSION_CACHE_ENGINE`      | `redis` in production, otherwise `memory` | Cache engine; allowed values are `redis` and `memory`.                             |
+| `SESSION_CACHE_NAME`        | `session`                                 | Named Catbox cache and Yar session name.                                           |
+| `SESSION_CACHE_TTL`         | `14400000`                                | Cache expiry, four hours.                                                          |
+| `SESSION_COOKIE_TTL`        | `14400000`                                | Session cookie expiry, four hours.                                                 |
+| `SESSION_COOKIE_PASSWORD`   | Development placeholder in config         | Yar and authentication cookie protection; supply a suitable secret for deployment. |
+| `SESSION_COOKIE_SECURE`     | `true` in production, otherwise `false`   | Session cookie secure flag.                                                        |
+| `REDIS_HOST`                | `127.0.0.1`                               | Redis host.                                                                        |
+| `REDIS_USERNAME`            | Empty string                              | Redis username; credentials are passed when this is nonempty.                      |
+| `REDIS_PASSWORD`            | Empty string                              | Redis password.                                                                    |
+| `REDIS_KEY_PREFIX`          | `trade-imports-fish-importer-fe:`         | Redis key prefix.                                                                  |
+| `USE_SINGLE_INSTANCE_CACHE` | `false` in production, otherwise `true`   | Use a single Redis instance rather than a cluster.                                 |
+| `REDIS_TLS`                 | `true` in production, otherwise `false`   | Enable Redis TLS.                                                                  |
 
 `SESSION_CACHE_ENGINE=false` is not a supported value. See [Sessions and caching](sessions-and-caching.md) for cache behavior.

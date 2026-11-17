@@ -3,6 +3,13 @@ import { statusCodes } from '#/server/common/constants/status-codes.js'
 
 describe('#homeController', () => {
   let server
+  const auth = {
+    strategy: 'session',
+    credentials: {
+      userId: 'test-user-felixstowe',
+      organisationId: 'test-org-suffolk-coastal-port-health-authority'
+    }
+  }
 
   beforeAll(async () => {
     server = await createServer()
@@ -16,7 +23,8 @@ describe('#homeController', () => {
   test('Should provide expected response', async () => {
     const { result, statusCode } = await server.inject({
       method: 'GET',
-      url: '/'
+      url: '/',
+      auth
     })
 
     expect(result).toEqual(

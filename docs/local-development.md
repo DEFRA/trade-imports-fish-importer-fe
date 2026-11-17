@@ -9,6 +9,49 @@ npm run dev
 
 By default the service listens on port 3000. The development command runs Nodemon with `.env` loaded if present; [`nodemon.json`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/nodemon.json) sets `NODE_ENV=development`. Vite middleware serves client assets; see [Client assets](client-assets.md). See [Configuration](configuration.md) for overrides.
 
+## Test user sign-in
+
+Both `npm run dev` and `npm run dev:debug` explicitly set `ENVIRONMENT=local`
+and `TEST_USER_SIGN_IN_ENABLED=true`; no `.env` file is needed to enable sign-in.
+Opening the homepage or a protected direct link redirects to the GOV.UK radio
+selection form. Choose a test user and click Continue:
+
+| Test user         | Organisation                          |
+| ----------------- | ------------------------------------- |
+| Felixstowe tester | Suffolk Coastal Port Health Authority |
+| Dover tester      | Dover Port Health Authority           |
+| Non-PHA tester    | Test importer                         |
+
+The descriptive IDs make test identities recognisable in saved data:
+
+| User ID                | Organisation ID                                  |
+| ---------------------- | ------------------------------------------------ |
+| `test-user-felixstowe` | `test-org-suffolk-coastal-port-health-authority` |
+| `test-user-dover`      | `test-org-dover-port-health-authority`           |
+| `test-user-non-pha`    | `test-org-test-importer`                         |
+
+Each user belongs to a separate organisation. The authority names are genuine;
+the users and IDs are synthetic, and Test importer is a fictional organisation.
+These labels do not grant PHA roles or permissions.
+No user is preselected and an invalid selection returns an
+accessible validation error without changing an existing session.
+
+The server-only catalogue is
+`src/server/common/helpers/test-users.json`. Edit test-user labels and synthetic IDs there
+and restart/redeploy; invalid records reject startup. Do not add real personal
+information or secrets. Organisation assignment comes only from this catalogue;
+the former `TEST_ORGANISATION_ID` override is no longer read.
+
+To switch users, visit the unlinked `/dev/identity` page, check the selected
+identity and use its CSRF-protected Sign out button, then select another user.
+This page requires a session and exists only when test user sign-in is enabled
+in `local`, `dev` or `test`. There is no header sign-out control.
+
+To run without the test identity provider, use
+`TEST_USER_SIGN_IN_ENABLED=false npm run server:watch`. Application pages remain
+protected and return HTTP 401 until another authentication provider is available.
+This feature does not contact an identity provider or create backend notifications.
+
 Other useful commands:
 
 | Command                  | Purpose                                                                    |

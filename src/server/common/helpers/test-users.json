@@ -1,0 +1,20 @@
+[
+  {
+    "userId": "test-user-felixstowe",
+    "name": "Felixstowe tester",
+    "organisationId": "test-org-suffolk-coastal-port-health-authority",
+    "organisationName": "Suffolk Coastal Port Health Authority"
+  },
+  {
+    "userId": "test-user-dover",
+    "name": "Dover tester",
+    "organisationId": "test-org-dover-port-health-authority",
+    "organisationName": "Dover Port Health Authority"
+  },
+  {
+    "userId": "test-user-non-pha",
+    "name": "Non-PHA tester",
+    "organisationId": "test-org-test-importer",
+    "organisationName": "Test importer"
+  }
+]
