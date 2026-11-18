@@ -19,17 +19,19 @@ function remember(request, notification) {
 
 async function findDraft(request, draft) {
   const notification = await notificationsClient.find(request, draft.id)
-  if (notification) {
-    if (notification.organisationId !== organisationId) {
-      throw new Error(
-        'Draft does not belong to the current importer organisation'
-      )
+  if (!notification) {
+    if (draft.saved) {
+      throw new Error('The saved notification draft could not be found')
     }
-    if (draft.reference && notification.reference !== draft.reference) {
-      throw new Error('Draft reference has unexpectedly changed')
-    }
-  } else if (draft.saved) {
-    throw new Error('The saved notification draft could not be found')
+    return null
+  }
+  if (notification.organisationId !== organisationId) {
+    throw new Error(
+      'Draft does not belong to the current importer organisation'
+    )
+  }
+  if (draft.reference && notification.reference !== draft.reference) {
+    throw new Error('Draft reference has unexpectedly changed')
   }
   return notification
 }

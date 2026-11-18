@@ -3,6 +3,7 @@ import {
   loadDraft,
   saveDraft
 } from '#/server/services/notifications/draft-session.js'
+import { statusCodes } from '#/server/common/constants/status-codes.js'
 import { transportDetailsModel } from './model.js'
 
 export const getTransportDetailsController = {
@@ -21,13 +22,15 @@ export const postTransportDetailsController = {
       return h
         .view('error/index', {
           pageTitle: 'Start again',
-          heading: 400,
+          heading: statusCodes.badRequest,
           message:
             'Your session has expired. Return to Transport details and try again.'
         })
-        .code(400)
+        .code(statusCodes.badRequest)
     }
     await saveDraft(request, request.payload.transportMethod)
-    return h.redirect('/notification/consignment-arrival-details').code(303)
+    return h
+      .redirect('/notification/consignment-arrival-details')
+      .code(statusCodes.seeOther)
   }
 }

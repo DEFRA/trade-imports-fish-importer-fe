@@ -3,6 +3,7 @@ import {
   postTransportDetailsController
 } from './controller.js'
 import { transportDetailsModel, transportDetailsSchema } from './model.js'
+import { statusCodes } from '#/server/common/constants/status-codes.js'
 
 export const transportDetails = {
   plugin: {
@@ -29,7 +30,7 @@ export const transportDetails = {
                       true
                     )
                   )
-                  .code(400)
+                  .code(statusCodes.badRequest)
                   .takeover()
               }
             }

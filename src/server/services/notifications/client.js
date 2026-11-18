@@ -1,6 +1,7 @@
 import Joi from 'joi'
 
 import { config } from '#/config/config.js'
+import { statusCodes } from '#/server/common/constants/status-codes.js'
 import { transportMethods } from '#/server/common/constants/transport-methods.js'
 
 const notificationSchema = Joi.object({
@@ -17,7 +18,9 @@ const notificationSchema = Joi.object({
   updatedAt: Joi.string().isoDate().strict().required()
 }).unknown(true)
 
-async function send(request, id, method, payload) {
+const requestTimeoutMs = 10000
+
+function buildHeaders(request, id, method, payload) {
   const headers = { accept: 'application/json' }
   const traceHeader = config.get('tracing.header')
   const traceId = request.headers[traceHeader]
@@ -30,34 +33,16 @@ async function send(request, id, method, payload) {
   if (method === 'POST') {
     headers['Idempotency-Key'] = id
   }
+  return headers
+}
 
-  const path = method === 'POST' ? '/notifications' : `/notifications/${id}`
-  const response = await fetch(
-    new URL(path, config.get('notificationApiUrl')),
-    {
-      method,
-      headers,
-      redirect: 'manual',
-      body: payload ? JSON.stringify(payload) : undefined,
-      signal: AbortSignal.timeout(10000)
-    }
-  )
+function expectedStatuses(method) {
+  return method === 'POST'
+    ? [statusCodes.ok, statusCodes.created]
+    : [statusCodes.ok]
+}
 
-  if (method === 'GET' && response.status === 404) {
-    await response.body?.cancel()
-    return null
-  }
-  const expectedStatuses = method === 'POST' ? [200, 201] : [200]
-  if (!expectedStatuses.includes(response.status)) {
-    await response.body?.cancel()
-    throw new Error(
-      `Notification API ${method} failed with status ${response.status}`
-    )
-  }
-
-  const notification = await notificationSchema.validateAsync(
-    await response.json()
-  )
+function verifyNotification(notification, id, payload) {
   if (notification.id !== id) {
     throw new Error('Notification API returned a different draft identity')
   }
@@ -70,6 +55,36 @@ async function send(request, id, method, payload) {
       'Notification API response does not match the saved details'
     )
   }
+}
+
+async function send(request, id, method, payload) {
+  const path = method === 'POST' ? '/notifications' : `/notifications/${id}`
+  const response = await fetch(
+    new URL(path, config.get('notificationApiUrl')),
+    {
+      method,
+      headers: buildHeaders(request, id, method, payload),
+      redirect: 'manual',
+      body: payload ? JSON.stringify(payload) : undefined,
+      signal: AbortSignal.timeout(requestTimeoutMs)
+    }
+  )
+
+  if (method === 'GET' && response.status === statusCodes.notFound) {
+    await response.body?.cancel()
+    return null
+  }
+  if (!expectedStatuses(method).includes(response.status)) {
+    await response.body?.cancel()
+    throw new Error(
+      `Notification API ${method} failed with status ${response.status}`
+    )
+  }
+
+  const notification = await notificationSchema.validateAsync(
+    await response.json()
+  )
+  verifyNotification(notification, id, payload)
   return notification
 }
 
