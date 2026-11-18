@@ -21,7 +21,9 @@ Allowed `transportMethod` values come from [`transport-methods.js`](https://gith
 
 - `loadDraft` on a first visit creates a session draft with a random UUID (`saved: false`) and returns `null`. Otherwise it looks the notification up through the API client and refreshes the session entry.
 - `saveDraft` looks up the existing notification first (to recover a first save whose response was lost), then updates it, or creates it if it does not exist.
-- Errors are thrown if the notification belongs to a different organisation, the reference changes, or a draft marked `saved` cannot be found.
+- Once a notification is found, created or updated, the session entry is rewritten with its `id` and `reference` and `saved: true`.
+- `saveDraft` throws if there is no draft in the session ("No active notification journey").
+- Errors are thrown if the notification belongs to a different organisation, the reference differs from the one in the session (on load or save) or changes during an update, or a draft marked `saved` cannot be found.
 - The organisation ID is the constant `local-importer-organisation` ([`organisation.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/common/constants/organisation.js)).
 
 ## Notification API client

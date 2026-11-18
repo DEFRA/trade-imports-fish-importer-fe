@@ -116,6 +116,25 @@ describe('notification draft session', () => {
     expect(notificationsClient.create).toHaveBeenCalledTimes(1)
   })
 
+  test('remembers a recovered draft so a failed update cannot lead to recreation', async () => {
+    await loadDraft(request)
+    const id = currentDraft(request).id
+    notificationsClient.find.mockResolvedValueOnce(saved(id))
+    notificationsClient.update.mockRejectedValueOnce(
+      new Error('Notification API PUT failed with status 404')
+    )
+    await expect(saveDraft(request, 'road-vehicle')).rejects.toThrow('404')
+    expect(currentDraft(request)).toEqual({
+      id,
+      saved: true,
+      reference: 'GBN-FIS-26-AXN04'
+    })
+    await expect(saveDraft(request, 'road-vehicle')).rejects.toThrow(
+      'could not be found'
+    )
+    expect(notificationsClient.create).not.toHaveBeenCalled()
+  })
+
   test('rejects another organisation and an unexpectedly changed reference', async () => {
     await loadDraft(request)
     const id = currentDraft(request).id

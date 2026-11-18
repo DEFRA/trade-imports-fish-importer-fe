@@ -54,6 +54,9 @@ export async function saveDraft(request, transportMethod) {
   }
   // Recover a committed first save even when its response was lost.
   const existing = await findDraft(request, draft)
+  if (existing) {
+    remember(request, existing)
+  }
   const payload = { organisationId, transportMethod }
   const notification = existing
     ? await notificationsClient.update(request, draft.id, payload)
