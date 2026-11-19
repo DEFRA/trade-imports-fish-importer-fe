@@ -12,10 +12,6 @@ The [Publish Hot Fix workflow](https://github.com/DEFRA/trade-imports-fish-impor
 
 Pull requests to `main` run security audit, frontend build, formatting, lint, tests and a Docker image build in the [pull request workflow](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/workflows/check-pull-request.yml).
 
-## Dependency updates
-
-[Dependabot](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/dependabot.yml) is configured for npm packages and GitHub Actions, checking weekly on Mondays at 10:30 Europe/London. The npm configuration allows up to 10 open pull requests, updates direct dependencies only, uses the `increase` versioning strategy, ignores `eslint` and `eslint-*`, and groups related packages (`build`, `lint`, `logging`, `tools` and `types`) into shared pull requests.
-
 ## Local Compose environment
 
 Run the local services with:
