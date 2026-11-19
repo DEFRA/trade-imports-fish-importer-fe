@@ -1,0 +1,47 @@
+{% extends 'layouts/page.njk' %}
+
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "govuk/components/radios/macro.njk" import govukRadios %}
+{% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
+
+{% block content %}
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+      {% if error %}
+        {{ govukErrorSummary({
+          titleText: "There is a problem",
+          errorList: [
+            { text: error.text, href: "#testUserId" }
+          ]
+        }) }}
+      {% endif %}
+
+      <h1 class="govuk-heading-l">{{ heading }}</h1>
+
+      {{ govukInsetText({
+        text: "For local development and dev/test environments only. Test user sign-in does not verify your identity or contact an identity provider."
+      }) }}
+
+      <p class="govuk-body">Choose a predefined test user to continue. Use synthetic data only.</p>
+
+      <form action="{{ signInUrl }}" method="post">
+        <input type="hidden" name="crumb" value="{{ crumb }}">
+        {{ govukRadios({
+          name: "testUserId",
+          fieldset: {
+            legend: {
+              text: "Choose a test user",
+              classes: "govuk-fieldset__legend--m"
+            }
+          },
+          items: testUsers,
+          errorMessage: error
+        }) }}
+        {{ govukButton({
+          text: "Continue"
+        }) }}
+      </form>
+    </div>
+  </div>
+{% endblock %}
