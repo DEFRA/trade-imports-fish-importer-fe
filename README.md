@@ -381,8 +381,12 @@ docker compose up --build -d
 
 ### Dependabot
 
-We have added an example dependabot configuration file to the repository. You can enable it by renaming
-the [.github/example.dependabot.yml](.github/example.dependabot.yml) to `.github/dependabot.yml`
+[Dependabot](.github/dependabot.yml) checks weekly for npm and GitHub Actions updates. Minor and patch
+updates are grouped by ecosystem; Vitest packages are grouped separately, including major updates.
+Other major updates are proposed separately.
+
+ESLint updates and Stylelint major updates are ignored. Review security alerts for ignored dependencies,
+and remove the Stylelint rule when `stylelint-config-gds` supports the new major version.
 
 ### SonarCloud
 
