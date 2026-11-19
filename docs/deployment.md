@@ -6,17 +6,15 @@ The [Dockerfile](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/ma
 
 ## Publishing
 
-The [Publish workflow](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/workflows/publish.yml) runs on pushes to `main` and manual dispatch. Its build job is skipped for the first workflow run, and runs only for pushes to `main` or manual dispatches from a branch other than `main`. The `scripts/configure-publish-settings.js` script sets the prerelease, prerelease suffix and Docker Hub push inputs. The job installs dependencies, builds frontend assets, runs tests, invokes the CDP build action to build and publish, then runs a SonarCloud scan. Runs are queued rather than cancelled.
+The [Publish workflow](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/workflows/publish.yml) runs on pushes to `main` and manual dispatch. The workflow's job conditions and publish settings script determine whether a run proceeds and its release versioning. It builds frontend assets, runs tests and invokes the CDP build action to build and publish.
 
-The [Publish Hot Fix workflow](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/workflows/publish-hotfix.yml) is manually dispatched. It builds the frontend, runs formatting, lint and tests, invokes the CDP hotfix build action, then runs a SonarCloud scan. Image publishing details are handled by those external CDP actions.
+The [Publish Hot Fix workflow](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/workflows/publish-hotfix.yml) is manually dispatched. It builds the frontend, runs formatting, lint and tests, then invokes the CDP hotfix build action. Image publishing details are handled by those external CDP actions.
 
-Both workflows use the Node.js version from `.nvmrc`.
-
-Pull requests to `main` (opened, reopened, synchronized or ready for review) run security audit, frontend build, formatting, lint, tests and a Docker image build in the [pull request workflow](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/workflows/check-pull-request.yml). It also runs a SonarCloud scan (skipped for Dependabot) and a dependency review that fails on moderate or higher severity issues.
+Pull requests to `main` run security audit, frontend build, formatting, lint, tests and a Docker image build in the [pull request workflow](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/workflows/check-pull-request.yml).
 
 ## Dependency updates
 
-[Dependabot](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/dependabot.yml) checks direct npm dependencies and GitHub Actions weekly (10:30 Europe/London). Minor and patch updates are grouped, and Vitest packages form their own npm group. ESLint packages and major `stylelint` updates are ignored.
+[Dependabot](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/dependabot.yml) is configured for npm packages and GitHub Actions, checking weekly on Mondays at 10:30 Europe/London. The npm configuration allows up to 10 open pull requests, updates direct dependencies only, uses the `increase` versioning strategy, ignores `eslint` and `eslint-*`, and groups related packages (`build`, `lint`, `logging`, `tools` and `types`) into shared pull requests.
 
 ## Local Compose environment
 
@@ -30,4 +28,4 @@ The [Compose file](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/
 
 ## Documentation publishing
 
-The documentation workflow in `.github/workflows/build-docs.yml` builds the MkDocs site in strict mode on pull requests and pushes to `main` that change `docs/**` or `mkdocs.yml`, and on manual dispatch. For non-pull-request events it deploys the built site to GitHub Pages.
+The documentation workflow in `.github/workflows/build-docs.yml` builds the MkDocs site in strict mode on relevant pull requests and pushes to `main`. For non-pull-request events it deploys the built site to GitHub Pages.

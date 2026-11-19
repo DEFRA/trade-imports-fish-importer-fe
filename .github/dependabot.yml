@@ -1,31 +1,58 @@
 version: 2
 
 updates:
+  # Update npm packages
   - package-ecosystem: npm
     directory: /
     open-pull-requests-limit: 10
 
+    # Group packages into shared PR
     groups:
-      vitest:
+      build:
+        patterns:
+          - '@babel/*'
+          - 'autoprefixer'
+          - 'babel-plugin-module-resolver'
+          - 'babel-loader'
+          - 'babel-plugin-transform-import-meta'
+          - 'tsx'
+          - 'webpack'
+          - 'webpack-*'
+          - 'terser-webpack-plugin'
+
+      lint:
+        patterns:
+          - 'prettier'
+          - 'stylelint'
+          - 'stylelint-*'
+
+      logging:
+        patterns:
+          - '*-pino'
+          - '*-pino-format'
+          - 'pino'
+          - 'pino-*'
+
+      tools:
         patterns:
           - 'vitest'
-          - '@vitest/*'
           - 'vitest-*'
+          - 'nodemon'
+          - 'npm-run-all'
+          - 'lodash'
+          - 'source-map-loader'
+          - 'sass-*'
+          - 'postcss-*'
 
-      minor-and-patch:
+      types:
         patterns:
-          - '*'
-        update-types:
-          - minor
-          - patch
+          - '@types/*'
 
     ignore:
       - dependency-name: 'eslint-*'
       - dependency-name: 'eslint'
-      - dependency-name: 'stylelint'
-        update-types:
-          - 'version-update:semver-major'
 
+    # Schedule run every Monday, local time
     schedule:
       interval: weekly
       time: '10:30'
@@ -34,19 +61,14 @@ updates:
     versioning-strategy: increase
 
     allow:
+      # Include direct package.json updates
       - dependency-type: direct
 
+  # Update GitHub Actions
   - package-ecosystem: github-actions
     directory: /
 
-    groups:
-      minor-and-patch:
-        patterns:
-          - '*'
-        update-types:
-          - minor
-          - patch
-
+    # Schedule run every Monday, local time
     schedule:
       interval: weekly
       time: '10:30'
