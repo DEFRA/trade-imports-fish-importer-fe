@@ -28,7 +28,7 @@ Allowed `transportMethod` values come from [`transport-methods.js`](https://gith
 
 ## Notification API client
 
-[`client.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/client.js) calls the backend at `NOTIFICATION_API_URL` (default `http://localhost:8085`; see [Configuration](configuration.md)).
+[`client.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/client.js) calls the backend at `NOTIFICATION_API_URL`, which defaults to `http://localhost:8085` locally and to `https://trade-imports-fish-be.{ENVIRONMENT}.cdp-int.defra.cloud` in CDP environments; see [Configuration](configuration.md).
 
 | Operation | Request                   | Notes                                                                         |
 | --------- | ------------------------- | ----------------------------------------------------------------------------- |

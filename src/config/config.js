@@ -13,6 +13,26 @@ const isProduction = process.env.NODE_ENV === 'production'
 const isTest = process.env.NODE_ENV === 'test'
 const isDevelopment = process.env.NODE_ENV === 'development'
 
+const cdpEnvironments = [
+  'local',
+  'infra-dev',
+  'management',
+  'dev',
+  'test',
+  'perf-test',
+  'ext-test',
+  'prod'
+]
+const cdpEnvironment = process.env.ENVIRONMENT ?? 'local'
+
+// Inside CDP, services call each other directly on their internal domain
+function defaultNotificationApiUrl() {
+  if (cdpEnvironment === 'local') {
+    return 'http://localhost:8085'
+  }
+  return `https://trade-imports-fish-be.${cdpEnvironment}.cdp-int.defra.cloud`
+}
+
 convict.addFormats(convictFormatWithValidator)
 
 export const config = convict({
@@ -46,10 +66,16 @@ export const config = convict({
     format: String,
     default: 'trade-imports-fish-importer-fe'
   },
+  cdpEnvironment: {
+    doc: 'The CDP environment the app is running in, injected by the platform',
+    format: cdpEnvironments,
+    default: 'local',
+    env: 'ENVIRONMENT'
+  },
   notificationApiUrl: {
-    doc: 'Base URL for the fish notification backend',
+    doc: 'Base URL for the fish notification backend, derived from ENVIRONMENT unless set',
     format: 'url',
-    default: 'http://localhost:8085',
+    default: defaultNotificationApiUrl(),
     env: 'NOTIFICATION_API_URL'
   },
   root: {
