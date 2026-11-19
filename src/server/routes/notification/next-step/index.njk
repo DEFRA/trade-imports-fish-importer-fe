@@ -1,0 +1,12 @@
+{% extends 'layouts/page.njk' %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+
+{% block beforeContent %}
+  {{ govukBackLink({
+    text: "Back",
+    href: "/notification/consignment-details"
+  }) }}
+{% endblock %}
+
+{% block content %}{% endblock %}

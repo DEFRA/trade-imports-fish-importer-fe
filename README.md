@@ -8,6 +8,7 @@ Core delivery platform Node.js Frontend Template.
 
 - [Requirements](#requirements)
   - [Node.js](#nodejs)
+- [Notification journey](#notification-journey)
 - [Server-side Caching](#server-side-caching)
 - [Redis](#redis)
 - [Local Development](#local-development)
@@ -41,6 +42,29 @@ To use the correct version of Node.js for this application, via nvm:
 cd trade-imports-fish-importer-fe
 nvm use
 ```
+
+## Notification journey
+
+The [guidance page](src/server/routes/notification/guidance/index.njk) links
+**Start now** to `/notification/consignment-details`. The form collects a port of
+entry and an expected arrival date and time. Port options are temporary seeded
+data in [ports.json](src/server/routes/notification/consignment-details/ports.json),
+not a live port directory.
+
+Validation runs on the frontend server using the
+[GOV.UK date-input guidance](https://design-system.service.gov.uk/components/date-input/),
+including real dates, four-digit years and numeric, full or abbreviated English
+months. Hours are 0-23 and minutes are 0-59; both accept one or two digits.
+Arrival must be after the current minute in `Europe/London`, with no past dates.
+The fixed date hint is retained from the design, even though its example is now
+in the past.
+
+Entered values are redisplayed on validation errors only. A successful POST
+redirects to `/notification/next-step`, a temporary empty page with the shared
+header, footer and Back link. Despite the **Save and continue** button text,
+this iteration saves no notification data, creates no notification session and
+calls no backend service. Returning using the Back link loads an empty form.
+Additional details, country of export and CHED fields are not implemented.
 
 ## Server-side Caching
 

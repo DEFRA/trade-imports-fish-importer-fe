@@ -118,7 +118,7 @@ describe('#guidanceController', () => {
     ])
   })
 
-  test('Should link Start now directly to transport details without creating a session', async () => {
+  test('Should link Start now directly to consignment details without creating a session', async () => {
     const { result, headers } = await server.inject({
       method: 'GET',
       url: '/notification/guidance'
@@ -128,7 +128,7 @@ describe('#guidanceController', () => {
 
     expect(startButton).toHaveLength(1)
     expect(startButton.text().trim()).toBe('Start now')
-    expect(startButton.attr('href')).toBe('/notification/transport-details')
+    expect(startButton.attr('href')).toBe('/notification/consignment-details')
     expect(
       (headers['set-cookie'] ?? []).some((cookie) =>
         cookie.startsWith(`${config.get('session.cache.name')}=`)
