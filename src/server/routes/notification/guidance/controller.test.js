@@ -129,7 +129,7 @@ describe('#guidanceController', () => {
     ])
   })
 
-  test('Should link Start now directly to transport details without creating a session', async () => {
+  test('Should link Start now to transport details without creating a session', async () => {
     const { result, headers } = await server.inject({
       method: 'GET',
       url: '/notification/guidance',

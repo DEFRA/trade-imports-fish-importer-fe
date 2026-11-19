@@ -2,7 +2,7 @@ import Joi from 'joi'
 
 import { config } from '#/config/config.js'
 import { statusCodes } from '#/server/common/constants/status-codes.js'
-import { transportMethods } from '#/server/common/constants/transport-methods.js'
+import { transportModes } from '#/server/common/constants/transport-methods.js'
 
 const notificationSchema = Joi.object({
   id: Joi.string().uuid().required(),
@@ -11,8 +11,16 @@ const notificationSchema = Joi.object({
     .required(),
   status: Joi.string().valid('DRAFT').required(),
   organisationId: Joi.string().required(),
-  transportMethod: Joi.string()
-    .valid(...transportMethods.map(({ value }) => value))
+  notification: Joi.object({
+    transport: Joi.object({
+      mode: Joi.string()
+        .valid(...transportModes.values())
+        .required()
+    })
+      .unknown(true)
+      .required()
+  })
+    .unknown(true)
     .required(),
   createdAt: Joi.string().isoDate().strict().required(),
   updatedAt: Joi.string().isoDate().strict().required()
@@ -49,7 +57,8 @@ function verifyNotification(notification, id, payload) {
   if (
     payload &&
     (notification.organisationId !== payload.organisationId ||
-      notification.transportMethod !== payload.transportMethod)
+      notification.notification.transport.mode !==
+        payload.notification.transport.mode)
   ) {
     throw new Error(
       'Notification API response does not match the saved details'
@@ -96,6 +105,6 @@ export const notificationsClient = {
     return send(request, id, 'POST', payload)
   },
   update(request, id, payload) {
-    return send(request, id, 'PUT', payload)
+    return send(request, id, 'PATCH', payload)
   }
 }

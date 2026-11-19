@@ -21,8 +21,13 @@ const auth = {
   }
 }
 
-function notification(id, transportMethod = 'air-freight') {
-  return { id, reference: 'GBN-FIS-26-AXN04', organisationId, transportMethod }
+function notification(id, mode = 'AIR_FREIGHT') {
+  return {
+    id,
+    reference: 'GBN-FIS-26-AXN04',
+    organisationId,
+    notification: { transport: { mode } }
+  }
 }
 
 function receiveCookies(jar, response) {
@@ -55,10 +60,12 @@ describe('transport details routes', () => {
     vi.resetAllMocks()
     notificationsClient.find.mockResolvedValue(null)
     notificationsClient.create.mockImplementation(
-      async (_request, id, payload) => notification(id, payload.transportMethod)
+      async (_request, id, payload) =>
+        notification(id, payload.notification.transport.mode)
     )
     notificationsClient.update.mockImplementation(
-      async (_request, id, payload) => notification(id, payload.transportMethod)
+      async (_request, id, payload) =>
+        notification(id, payload.notification.transport.mode)
     )
   })
 
@@ -106,30 +113,45 @@ describe('transport details routes', () => {
     )
     expect($('main form button').text().trim()).toBe('Save and continue')
     expect($('.govuk-back-link').attr('href')).toBe('/notification/guidance')
+    expect(notificationsClient.find).not.toHaveBeenCalled()
     expect(notificationsClient.create).not.toHaveBeenCalled()
   })
 
-  test.each(['ship-or-vessel', 'air-freight', 'road-vehicle'])(
-    'saves %s, then redirects to the intentionally missing next page',
-    async (transportMethod) => {
-      const response = await submit(await visit(), transportMethod)
+  test.each([
+    ['ship-or-vessel', 'VESSEL'],
+    ['air-freight', 'AIR_FREIGHT'],
+    ['road-vehicle', 'ROAD_VEHICLE']
+  ])(
+    'saves %s, then redirects to consignment details',
+    async (transportMethod, mode) => {
+      const journey = await visit()
+      const response = await submit(journey, transportMethod)
       expect(response.statusCode).toBe(303)
       expect(response.headers.location).toBe(
-        '/notification/consignment-arrival-details'
+        '/notification/consignment-details'
       )
       expect(notificationsClient.create).toHaveBeenCalledWith(
         expect.anything(),
         expect.stringMatching(/^[a-f0-9-]{36}$/),
-        { organisationId, transportMethod }
+        { organisationId, notification: { transport: { mode } } }
       )
-      expect(
-        (await server.inject({ url: response.headers.location, auth }))
-          .statusCode
-      ).toBe(404)
+      const destination = await server.inject({
+        url: response.headers.location,
+        auth,
+        headers: { cookie: cookieHeader(journey.jar) }
+      })
+      expect(destination.statusCode).toBe(200)
+      expect(load(destination.payload)('h1').text()).toBe('Consignment details')
     }
   )
 
-  test.each([undefined, '', 'train', ['air-freight', 'road-vehicle']])(
+  test.each([
+    undefined,
+    '',
+    'train',
+    'AIR_FREIGHT',
+    ['air-freight', 'road-vehicle']
+  ])(
     'invalid selection %j renders accessible errors without persistence',
     async (transportMethod) => {
       const response = await submit(await visit(), transportMethod)
@@ -149,20 +171,106 @@ describe('transport details routes', () => {
     }
   )
 
-  test('returning selects saved choice, changing and repeating saves update the same draft', async () => {
+  test.each([
+    ['VESSEL', 'ship-or-vessel'],
+    ['AIR_FREIGHT', 'air-freight'],
+    ['ROAD_VEHICLE', 'road-vehicle']
+  ])(
+    'preselects the current canonical %s mode using the existing radio value',
+    async (mode, transportMethod) => {
+      const journey = await visit()
+      await submit(journey, 'air-freight')
+      const id = notificationsClient.create.mock.calls[0][1]
+      notificationsClient.find.mockResolvedValue(notification(id, mode))
+      const response = await server.inject({
+        method: 'GET',
+        url: path,
+        auth,
+        headers: { cookie: cookieHeader(journey.jar) }
+      })
+      const $ = load(response.payload)
+      expect(response.statusCode).toBe(200)
+      expect($('input[type="radio"]:checked')).toHaveLength(1)
+      expect($('input[type="radio"]:checked').val()).toBe(transportMethod)
+      expect(
+        $('input[type="radio"]')
+          .map((_i, input) => $(input).val())
+          .get()
+      ).toEqual(['ship-or-vessel', 'air-freight', 'road-vehicle'])
+    }
+  )
+
+  test('retains a valid presentation selection when another submitted field is invalid', async () => {
     const journey = await visit()
-    await submit(journey, 'air-freight')
+    const response = await server.inject({
+      method: 'POST',
+      url: path,
+      auth,
+      headers: { cookie: cookieHeader(journey.jar) },
+      payload: {
+        transportMethod: 'road-vehicle',
+        unsupported: 'value',
+        crumb: journey.crumb
+      }
+    })
+    const $ = load(response.payload)
+    expect(response.statusCode).toBe(400)
+    expect($('input:checked').val()).toBe('road-vehicle')
+    expect($('title').text().trim()).toMatch(/^Error: Transport details/)
+    expect($('.govuk-error-summary a').attr('href')).toBe('#transportMethod')
+    expect(notificationsClient.create).not.toHaveBeenCalled()
+    expect(notificationsClient.update).not.toHaveBeenCalled()
+  })
+
+  test('guidance leads through transport to consignment, and returning and resaving use the same draft', async () => {
+    const guidance = await server.inject({
+      url: '/notification/guidance',
+      auth
+    })
+    expect(guidance.statusCode).toBe(200)
+    const jar = {}
+    receiveCookies(jar, guidance)
+    const start = load(guidance.payload)('a.govuk-button--start').attr('href')
+    expect(start).toBe(path)
+    const transport = await server.inject({
+      url: start,
+      auth,
+      headers: { cookie: cookieHeader(jar) }
+    })
+    expect(transport.statusCode).toBe(200)
+    receiveCookies(jar, transport)
+    const journey = {
+      jar,
+      crumb: load(transport.payload)('form input[name="crumb"]').val()
+    }
+    const saved = await submit(journey, 'air-freight')
+    expect(saved.statusCode).toBe(303)
+    const consignment = await server.inject({
+      url: saved.headers.location,
+      auth,
+      headers: { cookie: cookieHeader(jar) }
+    })
+    expect(consignment.statusCode).toBe(200)
+    receiveCookies(jar, consignment)
+    const back = load(consignment.payload)('.govuk-back-link').attr('href')
+    expect(back).toBe(path)
     const id = notificationsClient.create.mock.calls[0][1]
     notificationsClient.find.mockResolvedValue(notification(id))
     const returned = await server.inject({
       method: 'GET',
-      url: path,
+      url: back,
       auth,
       headers: { cookie: cookieHeader(journey.jar) }
     })
+    expect(returned.statusCode).toBe(200)
     expect(load(returned.payload)('input:checked').val()).toBe('air-freight')
+    expect(load(returned.payload)('.govuk-back-link').attr('href')).toBe(
+      '/notification/guidance'
+    )
+    receiveCookies(jar, returned)
+    journey.crumb = load(returned.payload)('form input[name="crumb"]').val()
     await submit(journey, 'road-vehicle')
-    notificationsClient.find.mockResolvedValue(notification(id, 'road-vehicle'))
+    notificationsClient.find.mockResolvedValue(notification(id, 'ROAD_VEHICLE'))
     await submit(journey, 'road-vehicle')
     expect(notificationsClient.create).toHaveBeenCalledTimes(1)
     expect(notificationsClient.update).toHaveBeenCalledTimes(2)
@@ -186,8 +294,18 @@ describe('transport details routes', () => {
     expect(notificationsClient.update).toHaveBeenCalledWith(
       expect.anything(),
       id,
-      { organisationId, transportMethod: 'road-vehicle' }
+      {
+        organisationId,
+        notification: { transport: { mode: 'ROAD_VEHICLE' } }
+      }
     )
+    notificationsClient.update.mockRejectedValueOnce(
+      new Error('Backend unavailable')
+    )
+    const failedUpdate = await submit(journey, 'road-vehicle')
+    expect(failedUpdate.statusCode).toBe(500)
+    expect(failedUpdate.headers.location).toBeUndefined()
+    expect(notificationsClient.create).toHaveBeenCalledTimes(1)
   })
 
   test('separate browser sessions do not share draft identities', async () => {

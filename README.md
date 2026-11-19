@@ -8,6 +8,7 @@ Core delivery platform Node.js Frontend Template.
 
 - [Requirements](#requirements)
   - [Node.js](#nodejs)
+- [Notification journey](#notification-journey)
 - [Server-side Caching](#server-side-caching)
 - [Redis](#redis)
 - [Local Development](#local-development)
@@ -42,6 +43,34 @@ To use the correct version of Node.js for this application, via nvm:
 cd trade-imports-fish-importer-fe
 nvm use
 ```
+
+## Notification journey
+
+The [guidance page](src/server/routes/notification/guidance/index.njk) links
+**Start now** to `/notification/transport-details`. The transport page creates a
+session draft on first visit and saves the selected transport method through the
+notification API before redirecting to `/notification/consignment-details`.
+The consignment form collects a port of entry and an expected arrival date and
+time. Its Back link returns to transport details with the saved method selected;
+the transport page's Back link returns to guidance. Port options are temporary
+seeded data in [ports.json](src/server/routes/notification/consignment-details/ports.json),
+not a live port directory.
+
+Validation runs on the frontend server using the
+[GOV.UK date-input guidance](https://design-system.service.gov.uk/components/date-input/),
+including real dates, four-digit years and numeric, full or abbreviated English
+months. Hours are 0-23 and minutes are 0-59; both accept one or two digits.
+Arrival must be after the current minute in `Europe/London`, with no past dates.
+The fixed date hint is retained from the design, even though its example is now
+in the past.
+
+Entered consignment values are redisplayed on validation errors only. A successful
+consignment POST redirects with 303 to `/notification/next-step`, an unregistered
+URL that returns the normal 404 page. Despite the
+**Save and continue** button text, the consignment page saves no arrival data,
+creates no notification draft and calls no backend service; the existing transport
+draft is unchanged. Revisiting consignment details loads an empty form.
+Additional details, country of export and CHED fields are not implemented.
 
 ## Server-side Caching
 

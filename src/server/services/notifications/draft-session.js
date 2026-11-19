@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
+import { toTransportMode } from '#/server/common/constants/transport-methods.js'
 import { notificationsClient } from './client.js'
 
 const sessionKey = 'notificationDraft'
@@ -73,7 +74,10 @@ export async function saveDraft(request, transportMethod) {
   if (existing) {
     remember(request, existing)
   }
-  const payload = { organisationId: organisationOf(request), transportMethod }
+  const payload = {
+    organisationId: organisationOf(request),
+    notification: { transport: { mode: toTransportMode(transportMethod) } }
+  }
   const notification = existing
     ? await notificationsClient.update(request, draft.id, payload)
     : await notificationsClient.create(request, draft.id, payload)

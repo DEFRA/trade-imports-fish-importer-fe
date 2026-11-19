@@ -4,6 +4,7 @@ import {
   saveDraft
 } from '#/server/services/notifications/draft-session.js'
 import { statusCodes } from '#/server/common/constants/status-codes.js'
+import { toTransportMethod } from '#/server/common/constants/transport-methods.js'
 import { transportDetailsModel } from './model.js'
 
 export const getTransportDetailsController = {
@@ -11,7 +12,11 @@ export const getTransportDetailsController = {
     const notification = await loadDraft(request)
     return h.view(
       'notification/transport-details/index',
-      transportDetailsModel(notification?.transportMethod)
+      transportDetailsModel(
+        notification
+          ? toTransportMethod(notification.notification.transport.mode)
+          : undefined
+      )
     )
   }
 }
@@ -30,7 +35,7 @@ export const postTransportDetailsController = {
     }
     await saveDraft(request, request.payload.transportMethod)
     return h
-      .redirect('/notification/consignment-arrival-details')
+      .redirect('/notification/consignment-details')
       .code(statusCodes.seeOther)
   }
 }

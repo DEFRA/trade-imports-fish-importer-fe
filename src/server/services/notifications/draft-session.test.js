@@ -11,12 +11,12 @@ vi.mock('./client.js', () => ({
 
 const organisationId = 'test-org-north-quay-seafood'
 
-function saved(id, transportMethod = 'air-freight') {
+function saved(id, mode = 'AIR_FREIGHT') {
   return {
     id,
     reference: 'GBN-FIS-26-AXN04',
     organisationId,
-    transportMethod
+    notification: { transport: { mode } }
   }
 }
 
@@ -35,10 +35,12 @@ describe('notification draft session', () => {
     }
     notificationsClient.find.mockResolvedValue(null)
     notificationsClient.create.mockImplementation(
-      async (_request, id, payload) => saved(id, payload.transportMethod)
+      async (_request, id, payload) =>
+        saved(id, payload.notification.transport.mode)
     )
     notificationsClient.update.mockImplementation(
-      async (_request, id, payload) => saved(id, payload.transportMethod)
+      async (_request, id, payload) =>
+        saved(id, payload.notification.transport.mode)
     )
   })
 
@@ -58,12 +60,18 @@ describe('notification draft session', () => {
     expect(notificationsClient.create).toHaveBeenCalledExactlyOnceWith(
       request,
       id,
-      { organisationId, transportMethod: 'air-freight' }
+      {
+        organisationId,
+        notification: { transport: { mode: 'AIR_FREIGHT' } }
+      }
     )
     expect(notificationsClient.update).toHaveBeenCalledExactlyOnceWith(
       request,
       id,
-      { organisationId, transportMethod: 'road-vehicle' }
+      {
+        organisationId,
+        notification: { transport: { mode: 'ROAD_VEHICLE' } }
+      }
     )
     expect(currentDraft(request)).toEqual({
       id,
@@ -72,6 +80,33 @@ describe('notification draft session', () => {
       organisationId
     })
   })
+
+  test.each([
+    ['ship-or-vessel', 'VESSEL'],
+    ['air-freight', 'AIR_FREIGHT'],
+    ['road-vehicle', 'ROAD_VEHICLE']
+  ])(
+    'updates %s with only canonical transport details, including unchanged saves',
+    async (transportMethod, mode) => {
+      await loadDraft(request)
+      const id = currentDraft(request).id
+      notificationsClient.find.mockResolvedValue({
+        ...saved(id),
+        notification: {
+          transport: { mode: 'AIR_FREIGHT', additionalDetail: 'retained' },
+          additionalSection: { detail: 'retained' }
+        },
+        metadata: { version: 1 }
+      })
+      await saveDraft(request, transportMethod)
+      expect(notificationsClient.update).toHaveBeenCalledExactlyOnceWith(
+        request,
+        id,
+        { organisationId, notification: { transport: { mode } } }
+      )
+      expect(notificationsClient.create).not.toHaveBeenCalled()
+    }
+  )
 
   test('recovers a committed save after a lost response, including a changed selection', async () => {
     await loadDraft(request)
@@ -86,15 +121,24 @@ describe('notification draft session', () => {
     expect(notificationsClient.create).toHaveBeenCalledTimes(1)
     expect(notificationsClient.update).toHaveBeenCalledWith(request, id, {
       organisationId,
-      transportMethod: 'road-vehicle'
+      notification: { transport: { mode: 'ROAD_VEHICLE' } }
     })
   })
 
-  test('returning after a lost create response shows the persisted choice', async () => {
+  test('returning after a lost create response reads the current backend choice', async () => {
     await loadDraft(request)
-    notificationsClient.find.mockResolvedValue(saved(currentDraft(request).id))
-    expect((await loadDraft(request)).transportMethod).toBe('air-freight')
+    notificationsClient.create.mockRejectedValueOnce(new Error('Lost response'))
+    await expect(saveDraft(request, 'air-freight')).rejects.toThrow(
+      'Lost response'
+    )
+    notificationsClient.find.mockResolvedValue(
+      saved(currentDraft(request).id, 'ROAD_VEHICLE')
+    )
+    expect((await loadDraft(request)).notification.transport.mode).toBe(
+      'ROAD_VEHICLE'
+    )
     expect(currentDraft(request).saved).toBe(true)
+    expect(notificationsClient.create).toHaveBeenCalledTimes(1)
   })
 
   test('a failed creation retry keeps its original key', async () => {
@@ -116,6 +160,7 @@ describe('notification draft session', () => {
     await expect(saveDraft(request, 'road-vehicle')).rejects.toThrow(
       'could not be found'
     )
+    await expect(loadDraft(request)).rejects.toThrow('could not be found')
     expect(notificationsClient.create).toHaveBeenCalledTimes(1)
   })
 
@@ -124,7 +169,7 @@ describe('notification draft session', () => {
     const id = currentDraft(request).id
     notificationsClient.find.mockResolvedValueOnce(saved(id))
     notificationsClient.update.mockRejectedValueOnce(
-      new Error('Notification API PUT failed with status 404')
+      new Error('Notification API PATCH failed with status 404')
     )
     await expect(saveDraft(request, 'road-vehicle')).rejects.toThrow('404')
     expect(currentDraft(request)).toEqual({
@@ -147,6 +192,11 @@ describe('notification draft session', () => {
       organisationId: 'another'
     })
     await expect(loadDraft(request)).rejects.toThrow('organisation')
+    await expect(saveDraft(request, 'air-freight')).rejects.toThrow(
+      'organisation'
+    )
+    expect(notificationsClient.create).not.toHaveBeenCalled()
+    expect(notificationsClient.update).not.toHaveBeenCalled()
     notificationsClient.find.mockResolvedValue(saved(id))
     await loadDraft(request)
     notificationsClient.find.mockResolvedValue({
@@ -154,6 +204,28 @@ describe('notification draft session', () => {
       reference: 'GBN-FIS-26-OTHER'
     })
     await expect(loadDraft(request)).rejects.toThrow('reference')
+    await expect(saveDraft(request, 'air-freight')).rejects.toThrow('reference')
+    expect(notificationsClient.update).not.toHaveBeenCalled()
+  })
+
+  test('rejects a changed reference returned by an update and keeps the recovered identity', async () => {
+    await loadDraft(request)
+    const id = currentDraft(request).id
+    notificationsClient.find.mockResolvedValue(saved(id))
+    notificationsClient.update.mockResolvedValue({
+      ...saved(id, 'ROAD_VEHICLE'),
+      reference: 'GBN-FIS-26-OTHER'
+    })
+    await expect(saveDraft(request, 'road-vehicle')).rejects.toThrow(
+      'reference has unexpectedly changed during save'
+    )
+    expect(currentDraft(request)).toEqual({
+      id,
+      saved: true,
+      reference: 'GBN-FIS-26-AXN04',
+      organisationId
+    })
+    expect(notificationsClient.create).not.toHaveBeenCalled()
   })
 
   test('cannot save without a journey session', async () => {
@@ -170,7 +242,7 @@ describe('notification draft session', () => {
       expect.any(String),
       {
         organisationId: 'test-org-harbour-fish',
-        transportMethod: 'air-freight'
+        notification: { transport: { mode: 'AIR_FREIGHT' } }
       }
     )
   })
