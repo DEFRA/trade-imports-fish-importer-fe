@@ -38,7 +38,8 @@ describe('#homeController', () => {
   test('Should link Create a new import notification to guidance', async () => {
     const { result } = await server.inject({
       method: 'GET',
-      url: '/'
+      url: '/',
+      auth
     })
     const $ = cheerio.load(result)
     const createButton = $('main a.govuk-button--start')

@@ -1,6 +1,15 @@
 # Notification journey
 
-The transport details step is the only notification page registered by the [router plugin](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/plugins/router.js). Its code lives in [`src/server/routes/notification/transport-details`](https://github.com/DEFRA/trade-imports-fish-importer-fe/tree/main/src/server/routes/notification/transport-details).
+The [router plugin](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/plugins/router.js) registers two notification pages: guidance and transport details. Their code lives under [`src/server/routes/notification`](https://github.com/DEFRA/trade-imports-fish-importer-fe/tree/main/src/server/routes/notification).
+
+## Guidance page
+
+`GET /notification/guidance` renders a static page titled "Submit your seafood import notification" ([controller](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/guidance/controller.js), [tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/guidance/controller.test.js)). The home page's "Create a new import notification" button links here.
+
+- Sections: Before you start, Documents you need, What happens when you upload your documents, Check the information carefully, and Related content.
+- Two expandable details panels cover "Help with required documents" and "Help with additional documents".
+- A "Back" link returns to `/`, and a related-content aside lists four guidance links.
+- The "Start now" button links directly to `/notification/transport-details`. The page does not create a session draft; that happens when the transport details page loads.
 
 ## Transport details page
 
@@ -13,7 +22,7 @@ Allowed `transportMethod` values come from [`transport-methods.js`](https://gith
 
 - If validation fails (including no selection), the page is re-rendered with status 400, an error summary and the message "Select how the consignment is being transported", and the page title is prefixed with `Error:`.
 - If the session has no draft on POST, a 400 error view ("Your session has expired...") is returned instead of saving.
-- The template includes the CSRF `crumb` hidden field and a back link to `/notification/guidance`. The router does not register that path or the redirect target.
+- The template includes the CSRF `crumb` hidden field and a back link to `/notification/guidance`. The router does not register the redirect target `/notification/consignment-arrival-details`.
 
 ## Draft session
 
