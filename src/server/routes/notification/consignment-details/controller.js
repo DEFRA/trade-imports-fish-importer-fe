@@ -1,11 +1,24 @@
 import { statusCodes } from '#/server/common/constants/status-codes.js'
+import { countries, isRestOfWorld } from './countries.js'
 import { ports } from './ports.js'
 import { validateConsignmentDetails } from './validation.js'
+
+function countryItems(selectedValue) {
+  return [
+    { value: '', text: 'Select a country' },
+    ...countries.map((country) => ({
+      value: country.value,
+      text: country.text,
+      attributes: { 'data-rest-of-world': String(isRestOfWorld(country)) }
+    }))
+  ].map((item) => ({ ...item, selected: item.value === selectedValue }))
+}
 
 function pageModel({ values = {}, errors = {} } = {}) {
   const errorList = Object.values(errors)
     .filter(Boolean)
     .map(({ text, fields }) => ({ text, href: `#${fields[0]}` }))
+  const countryValue = values['country-of-export']?.trim() ?? ''
 
   return {
     pageTitle: `${errorList.length ? 'Error: ' : ''}Consignment details`,
@@ -17,7 +30,8 @@ function pageModel({ values = {}, errors = {} } = {}) {
         ...port,
         selected: port.value === (values.port?.trim() ?? '')
       })
-    )
+    ),
+    countries: countryItems(countryValue)
   }
 }
 

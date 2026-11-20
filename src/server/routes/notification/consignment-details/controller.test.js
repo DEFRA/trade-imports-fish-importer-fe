@@ -9,7 +9,9 @@ const validPayload = {
   'arrival-month': '11',
   'arrival-year': '2026',
   'arrival-hour': '09',
-  'arrival-minute': '30'
+  'arrival-minute': '30',
+  'country-of-export': 'FR',
+  'ched-reference': ''
 }
 
 describe('Consignment details journey', () => {
@@ -64,7 +66,7 @@ describe('Consignment details journey', () => {
     const response = await server.inject({ method: 'GET', url })
     const $ = cheerio.load(response.payload)
     const form = $('main form')
-    const fields = form.find('input:not([type="hidden"])')
+    const fields = form.find('input[id^="arrival-"]')
 
     expect(response.statusCode).toBe(200)
     expect($('head > title').text().trim()).toBe(
@@ -75,7 +77,11 @@ describe('Consignment details journey', () => {
     expect($('main h1')).toHaveLength(1)
     expect($('main h1').text()).toBe('Consignment details')
     expect($('.govuk-caption-l').text()).toBe('Import notification')
-    expect($('main h2').text()).toBe('Arrival details')
+    expect(
+      $('main h2')
+        .map((_, heading) => $(heading).text())
+        .get()
+    ).toEqual(['Arrival details', 'Additional details'])
     expect($('main').text()).toContain(
       'Provide your port of entry and expected date of arrival.'
     )
@@ -89,10 +95,9 @@ describe('Consignment details journey', () => {
     expect(form.find('button[type="submit"]').text().trim()).toBe(
       'Save and continue'
     )
-    expect(form.find('select').val()).toBe('')
+    expect($('#port').val()).toBe('')
     expect(
-      form
-        .find('select option')
+      $('#port option')
         .map((_, option) => $(option).text().trim())
         .get()
     ).toEqual([
@@ -133,10 +138,7 @@ describe('Consignment details journey', () => {
       )
     }
     expect(form.find('.govuk-error-summary')).toHaveLength(0)
-    expect($('main hr')).toHaveLength(0)
-    expect($('main').text()).not.toMatch(
-      /Additional details|Country of export|CHED/
-    )
+    expect($('main hr.govuk-section-break--visible')).toHaveLength(1)
     expectNoSession(response)
   })
 
@@ -158,7 +160,8 @@ describe('Consignment details journey', () => {
     expect(links.map((_, link) => $(link).attr('href')).get()).toEqual([
       '#port',
       '#arrival-day',
-      '#arrival-hour'
+      '#arrival-hour',
+      '#country-of-export'
     ])
     links.each((_, link) => {
       const field = $($(link).attr('href'))
@@ -168,7 +171,7 @@ describe('Consignment details journey', () => {
         $(link).text()
       )
     })
-    expect($('.govuk-error-message')).toHaveLength(3)
+    expect($('.govuk-error-message')).toHaveLength(4)
     expect($('#arrival-date input.govuk-input--error')).toHaveLength(3)
     expect($('#arrival-hour').hasClass('govuk-input--error')).toBe(true)
     expect($('#arrival-minute').hasClass('govuk-input--error')).toBe(true)
@@ -322,6 +325,144 @@ describe('Consignment details journey', () => {
     expect($('#arrival-minute').attr('value') ?? '').toBe('')
     expect($('.govuk-error-summary')).toHaveLength(0)
   })
+
+  test('renders the country of export and a CHED reference field with guidance', async () => {
+    const response = await server.inject({ method: 'GET', url })
+    const $ = cheerio.load(response.payload)
+    const options = $('#country-of-export option')
+    const chedInput = $('#ched-reference')
+    const describedBy = chedInput.attr('aria-describedby').split(' ')
+
+    expect($('label[for="country-of-export"]').text().trim()).toBe(
+      'Country of export'
+    )
+    expect($('#country-of-export-hint').text().trim()).toBe(
+      'If the country is outside the EU, you will need to give a CHED reference.'
+    )
+    expect($('#country-of-export').val()).toBe('')
+    expect(options.first().text().trim()).toBe('Select a country')
+    expect(
+      $('#country-of-export option[value="FR"]').attr('data-rest-of-world')
+    ).toBe('false')
+    expect(
+      $('#country-of-export option[value="AO"]').attr('data-rest-of-world')
+    ).toBe('true')
+    expect($('label[for="ched-reference"]').text().trim()).toBe(
+      'CHED reference'
+    )
+    expect(describedBy).toContain('ched-reference-guidance')
+    expect(describedBy).toContain('ched-reference-hint')
+    expect($('#ched-reference-hint').text().trim()).toBe(
+      'For example, CHEDP.XI.2025.1234567'
+    )
+    const guidance = $('#ched-reference-container #ched-reference-guidance')
+    expect(guidance).toHaveLength(1)
+    expect(guidance.closest('details')).toHaveLength(0)
+    expect(guidance.text()).toContain(
+      'Get a CHED reference by submitting an import notification in IPAFFS'
+    )
+    expect(chedInput.attr('spellcheck')).toBe('false')
+    expect(
+      chedInput.closest('[data-module="app-ched-reference"]')
+    ).toHaveLength(1)
+    expect($('#ched-reference-container').attr('hidden')).toBeUndefined()
+  })
+
+  test('includes the prototype country and territory choices with unique values', async () => {
+    const response = await server.inject({ method: 'GET', url })
+    const $ = cheerio.load(response.payload)
+    const options = $('#country-of-export option').slice(1)
+    const values = options.map((_, option) => $(option).val()).get()
+
+    expect(values).not.toContain('')
+    expect(new Set(values).size).toBe(values.length)
+    for (const [value, name] of [
+      ['AU', 'Australia'],
+      ['BR', 'Brazil'],
+      ['JP', 'Japan'],
+      ['NZ', 'New Zealand'],
+      ['NR', 'Naoero'],
+      ['british-antarctic-territory', 'British Antarctic Territory'],
+      [
+        'akrotiri-and-dhekelia',
+        'The Sovereign Base Areas of Akrotiri and Dhekelia'
+      ]
+    ]) {
+      const option = $(`#country-of-export option[value="${value}"]`)
+      expect(option).toHaveLength(1)
+      expect(option.text().trim()).toBe(name)
+      expect(option.attr('data-rest-of-world')).toBe('true')
+    }
+  })
+
+  test('does not require or keep a CHED reference for an EU country', async () => {
+    const response = await submit({
+      'country-of-export': 'FR',
+      'ched-reference': 'not a reference'
+    })
+
+    expect(response.statusCode).toBe(303)
+    expect(response.headers.location).toBe('/notification/next-step')
+  })
+
+  test('requires a CHED reference for Australia', async () => {
+    const response = await submit({ 'country-of-export': 'AU' })
+    const $ = cheerio.load(response.payload)
+
+    expect(response.statusCode).toBe(400)
+    expect($('#country-of-export').val()).toBe('AU')
+    expect($('#ched-reference-error').text()).toContain(
+      'Enter a CHED reference'
+    )
+    expect($('.govuk-error-summary__list a').attr('href')).toBe(
+      '#ched-reference'
+    )
+  })
+
+  test.each([
+    ['', 'Enter a CHED reference'],
+    [
+      'CHEDA.XI.2025.1234567',
+      'Enter a CHED reference in the correct format, like CHEDP.XI.2025.1234567'
+    ]
+  ])(
+    'blocks a rest-of-the-world country with a missing or badly formatted CHED reference: %j',
+    async (reference, message) => {
+      const response = await submit({
+        'country-of-export': 'AO',
+        'ched-reference': reference
+      })
+      const $ = cheerio.load(response.payload)
+      const links = $('.govuk-error-summary__list a')
+
+      expect(response.statusCode).toBe(400)
+      expect(response.headers.location).toBeUndefined()
+      expect($('head > title').text().trim()).toBe(
+        `Error: Consignment details | ${config.get('serviceName')}`
+      )
+      expect(links).toHaveLength(1)
+      expect(links.attr('href')).toBe('#ched-reference')
+      expect(links.text().trim()).toBe(message)
+      expect($('#ched-reference-error').text()).toContain(message)
+      expect($('#ched-reference').hasClass('govuk-input--error')).toBe(true)
+      expect($('#ched-reference').val()).toBe(reference)
+      expect($('#country-of-export').val()).toBe('AO')
+      expect($('#port').val()).toBe('dover')
+    }
+  )
+
+  test.each(['AO', 'AU'])(
+    'accepts a valid CHED reference for rest-of-the-world country %s',
+    async (country) => {
+      const response = await submit({
+        'country-of-export': country,
+        'ched-reference': '  chedp.xi.2025.1234567 '
+      })
+
+      expect(response.statusCode).toBe(303)
+      expect(response.headers.location).toBe('/notification/next-step')
+    }
+  )
 
   test('rejects submissions without a CSRF token', async () => {
     const response = await server.inject({
