@@ -353,7 +353,7 @@ describe('Consignment details journey', () => {
     expect(describedBy).toContain('ched-reference-hint')
     expect(describedBy).not.toContain('ched-reference-guidance')
     expect($('#ched-reference-hint').text().trim()).toBe(
-      'For example, CHEDP.XI.2025.1234567'
+      'For example, CHEDP.GB.2026.1234567'
     )
     const details = $(
       '#ched-reference-container details#ched-reference-guidance'
@@ -449,7 +449,7 @@ describe('Consignment details journey', () => {
     ['', 'Enter a CHED reference'],
     [
       'CHEDA.XI.2025.1234567',
-      'Enter a CHED reference in the correct format, like CHEDP.XI.2025.1234567'
+      'Enter a CHED reference in the correct format, like CHEDP.GB.2026.1234567'
     ]
   ])(
     'blocks a rest-of-the-world country with a missing or badly formatted CHED reference: %j',

@@ -356,7 +356,7 @@ describe('Consignment details validation', () => {
         validate({ 'country-of-export': 'AO', 'ched-reference': reference })
           .errors.ched
       ).toEqual({
-        text: 'Enter a CHED reference in the correct format, like CHEDP.XI.2025.1234567',
+        text: 'Enter a CHED reference in the correct format, like CHEDP.GB.2026.1234567',
         fields: ['ched-reference']
       })
     })
