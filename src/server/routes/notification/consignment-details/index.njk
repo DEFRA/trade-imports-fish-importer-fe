@@ -3,6 +3,7 @@
 {% from "govuk/components/back-link/macro.njk" import govukBackLink %}
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/date-input/macro.njk" import govukDateInput %}
+{% from "govuk/components/details/macro.njk" import govukDetails %}
 {% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
 {% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
 {% from "govuk/components/fieldset/macro.njk" import govukFieldset %}
@@ -111,6 +112,54 @@
               }) }}
             </div>
           {% endcall %}
+        </div>
+
+        <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+        <h2 class="govuk-heading-m">Additional details</h2>
+
+        {{ govukSelect({
+          id: "country-of-export",
+          name: "country-of-export",
+          label: {
+            text: "Country of export",
+            classes: "govuk-label--s"
+          },
+          hint: {
+            text: "If the country is outside the EU, you will need to give a CHED reference."
+          },
+          items: countries,
+          errorMessage: errors.country
+        }) }}
+
+        <div id="ched-reference-container" data-module="app-ched-reference">
+          {{ govukInput({
+            id: "ched-reference",
+            name: "ched-reference",
+            label: {
+              text: "CHED reference",
+              classes: "govuk-label--s"
+            },
+            hint: {
+              text: "For example, CHEDP.GB.2026.1234567"
+            },
+            classes: "govuk-input--width-20",
+            spellcheck: false,
+            autocomplete: "off",
+            value: values["ched-reference"],
+            errorMessage: errors.ched
+          }) }}
+
+          {% set chedGuidanceHtml %}
+            Apply for a CHED reference through TRACES NT. Read the
+            <a href="https://webgate.ec.europa.eu/imsoc-guide/tracesnt-help/Content/en/documents-certificates/ched.html" class="govuk-link" rel="noreferrer noopener" target="_blank">guidance on CHEDs in TRACES NT (opens in a new tab)</a>.
+          {% endset %}
+
+          {{ govukDetails({
+            id: "ched-reference-guidance",
+            summaryText: "How to get a CHED reference",
+            html: chedGuidanceHtml
+          }) }}
         </div>
 
         {{ govukButton({ text: "Save and continue" }) }}

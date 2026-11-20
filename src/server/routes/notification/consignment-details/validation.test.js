@@ -7,7 +7,9 @@ const validPayload = {
   'arrival-month': '11',
   'arrival-year': '2026',
   'arrival-hour': '09',
-  'arrival-minute': '30'
+  'arrival-minute': '30',
+  'country-of-export': 'FR',
+  'ched-reference': ''
 }
 
 function validate(overrides, clock = now) {
@@ -583,4 +585,94 @@ describe('Consignment details validation', () => {
       expect(errors.time.text).toBe('Enter the expected time of arrival')
     }
   )
+
+  describe('country of export and CHED reference', () => {
+    test.each(['', 'XX', ['FR'], { value: 'FR' }])(
+      'rejects a missing, unknown or malformed country: %j',
+      (country) => {
+        const { errors } = validate({ 'country-of-export': country })
+
+        expect(errors.country).toEqual({
+          text: 'Select a country of export from the list',
+          fields: ['country-of-export']
+        })
+        expect(errors.ched).toBeUndefined()
+      }
+    )
+
+    test.each(['FR', 'IE', 'DE'])(
+      'does not ask for or keep a CHED reference for EU country %s',
+      (country) => {
+        const { errors, values } = validate({
+          'country-of-export': country,
+          'ched-reference': 'CHEDA.XI.2025.1234567'
+        })
+
+        expect(errors.ched).toBeUndefined()
+        expect(values['ched-reference']).toBe('')
+      }
+    )
+
+    test.each([
+      'AO',
+      'US',
+      'NO',
+      'CH',
+      'AU',
+      'british-antarctic-territory',
+      'akrotiri-and-dhekelia'
+    ])(
+      'requires a CHED reference for rest-of-the-world country %s',
+      (country) => {
+        expect(
+          validate({ 'country-of-export': country, 'ched-reference': '  ' })
+            .errors.ched
+        ).toEqual({
+          text: 'Enter a CHED reference',
+          fields: ['ched-reference']
+        })
+      }
+    )
+
+    test.each([
+      'CHEDA.XI.2025.1234567',
+      'CHEDD.XI.2025.1234567',
+      'CHEDPP.XI.2025.1234567',
+      'CHEDP.XI.2025.123456',
+      'CHEDP.XI.2025.12345678',
+      'CHEDPXI20251234567',
+      'CHEDP.XI2025.1234567',
+      'CHEDP.X.2025.1234567',
+      'CHEDP.XI.25.1234567',
+      'CHEDP.XI.2025.1234567X',
+      'REF CHEDP.XI.2025.1234567',
+      'CHEDP.XI.2025.1234 567'
+    ])('rejects a badly formatted CHED reference: %s', (reference) => {
+      expect(
+        validate({ 'country-of-export': 'AO', 'ched-reference': reference })
+          .errors.ched
+      ).toEqual({
+        text: 'Enter a CHED reference in the correct format, like CHEDP.GB.2026.1234567',
+        fields: ['ched-reference']
+      })
+    })
+
+    test.each([
+      ['CHEDP.XI.2025.1234567', 'CHEDP.XI.2025.1234567'],
+      ['CHEDP.GB.2026.1234567', 'CHEDP.GB.2026.1234567'],
+      ['  chedp.xi.2025.1234567 ', 'CHEDP.XI.2025.1234567'],
+      ['ChedP.Gb.2026.0000001', 'CHEDP.GB.2026.0000001']
+    ])(
+      'accepts and normalises a valid CHED reference: %j',
+      (reference, normalised) => {
+        const { errors, values } = validate({
+          'country-of-export': 'AO',
+          'ched-reference': reference
+        })
+
+        expect(Object.values(errors).filter(Boolean)).toEqual([])
+        expect(values['ched-reference']).toBe(normalised)
+      }
+    )
+  })
 })
