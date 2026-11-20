@@ -1,0 +1,23 @@
+[
+  {
+    "userId": "test-user-importer-north-quay",
+    "name": "North Quay Importer",
+    "role": "importer",
+    "organisationId": "test-org-north-quay-seafood",
+    "organisationName": "North Quay Seafood Ltd"
+  },
+  {
+    "userId": "test-user-importer-westhaven",
+    "name": "Westhaven Importer",
+    "role": "importer",
+    "organisationId": "test-org-westhaven-fish-imports",
+    "organisationName": "Westhaven Fish Imports Ltd"
+  },
+  {
+    "userId": "test-user-agent-harbourgate",
+    "name": "Harbourgate Import Agent",
+    "role": "importer-agent",
+    "organisationId": "test-org-harbourgate-customs-services",
+    "organisationName": "Harbourgate Customs Services Ltd"
+  }
+]

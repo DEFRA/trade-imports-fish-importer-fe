@@ -12,6 +12,7 @@ Core delivery platform Node.js Frontend Template.
 - [Redis](#redis)
 - [Local Development](#local-development)
   - [Setup](#setup)
+  - [Test user sign-in](#test-user-sign-in)
   - [Signed Commits](#signed-commits)
   - [Development](#development)
   - [Production](#production)
@@ -84,6 +85,40 @@ Install application dependencies:
 ```bash
 npm install
 ```
+
+### Test user sign-in
+
+DEFRA SSO is not implemented yet. Test user sign-in lets developers and testers
+use predefined identities without contacting an identity provider.
+
+- **Local development:** `npm run dev` and `npm run dev:debug` enable it for
+  convenience by setting `ENVIRONMENT=local` and `TEST_USER_SIGN_IN_ENABLED=true`.
+  No `.env` setup is required.
+- **Deployed dev/test:** Disabled by default. To enable it, set
+  `TEST_USER_SIGN_IN_ENABLED=true` in the service's environment-specific
+  [dev](https://github.com/DEFRA/cdp-app-config/blob/main/services/trade-imports-fish-importer-fe/dev/trade-imports-fish-importer-fe.env)
+  or [test](https://github.com/DEFRA/cdp-app-config/blob/main/services/trade-imports-fish-importer-fe/test/trade-imports-fish-importer-fe.env)
+  configuration and redeploy. Do not add it to shared defaults or production.
+
+Test user sign-in is only allowed when `ENVIRONMENT` is `local`, `dev` or `test`.
+Enabling it in any other environment, including production, prevents startup.
+
+When enabled, opening a protected page (such as <http://localhost:3000/>) without
+a valid session redirects to the test user sign-in page. Choose a user and click
+**Continue** to return to the requested page.
+
+Users, roles and organisations are defined in the server-only
+[test user catalogue](src/server/common/helpers/test-users.json). Edit this file
+and restart/redeploy the frontend to change them. It contains two importers
+(`importer`) and one importer agent (`importer-agent`), with fictional organisations.
+Inspector/PHA/PHI users belong to the separate inspector journey and are not included.
+Roles are mock identity data, not role-based access rules. Use synthetic data only.
+
+Visit `/dev/identity` to check the signed-in user, role and organisation, or **Sign out**
+to switch users.
+
+When test user sign-in is disabled, its pages are unavailable and protected
+application pages return HTTP 401 until another authentication provider is implemented.
 
 ### Signed Commits
 

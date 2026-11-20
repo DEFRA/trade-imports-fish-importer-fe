@@ -9,6 +9,54 @@ npm run dev
 
 By default the service listens on port 3000. The development command runs Nodemon with `.env` loaded if present; [`nodemon.json`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/nodemon.json) sets `NODE_ENV=development`. Vite middleware serves client assets; see [Client assets](client-assets.md). See [Configuration](configuration.md) for overrides.
 
+## Test user sign-in
+
+Both `npm run dev` and `npm run dev:debug` explicitly set `ENVIRONMENT=local`
+and `TEST_USER_SIGN_IN_ENABLED=true`; no `.env` file is needed to enable sign-in.
+Opening the homepage or a protected direct link redirects to the GOV.UK radio
+selection form. Choose a test user and click Continue:
+
+| Test user                | Role             | Organisation                     |
+| ------------------------ | ---------------- | -------------------------------- |
+| North Quay Importer      | `importer`       | North Quay Seafood Ltd           |
+| Westhaven Importer       | `importer`       | Westhaven Fish Imports Ltd       |
+| Harbourgate Import Agent | `importer-agent` | Harbourgate Customs Services Ltd |
+
+The descriptive IDs make test identities recognisable in saved data:
+
+| User ID                         | Organisation ID                         |
+| ------------------------------- | --------------------------------------- |
+| `test-user-importer-north-quay` | `test-org-north-quay-seafood`           |
+| `test-user-importer-westhaven`  | `test-org-westhaven-fish-imports`       |
+| `test-user-agent-harbourgate`   | `test-org-harbourgate-customs-services` |
+
+Each user belongs to a separate fictional organisation. All users and IDs are
+synthetic. The catalogue covers the importer journey only: two importers and one
+importer agent. Inspector/PHA/PHI users belong to the separate inspector journey
+and are not included. Roles are mock identity data; they do not introduce
+role-based access rules. The sign-in options show each user's role and organisation.
+No user is preselected and an invalid selection returns an
+accessible validation error without changing an existing session.
+
+The server-only catalogue is
+`src/server/common/helpers/test-users.json`. Edit test-user labels, roles and synthetic IDs there
+and restart/redeploy; invalid records reject startup. Do not add real personal
+information or secrets. Every user must have a role of `importer` or `importer-agent`.
+Role and organisation assignments come only from this catalogue;
+the former `TEST_ORGANISATION_ID` override is no longer read.
+Sessions whose role or organisation assignment no longer matches the catalogue
+are invalidated; users must sign in again.
+
+To switch users, visit the unlinked `/dev/identity` page, check the selected
+identity, role and organisation and use its CSRF-protected Sign out button, then select another user.
+This page requires a session and exists only when test user sign-in is enabled
+in `local`, `dev` or `test`. There is no header sign-out control.
+
+To run without the test identity provider, use
+`TEST_USER_SIGN_IN_ENABLED=false npm run server:watch`. Application pages remain
+protected and return HTTP 401 until another authentication provider is available.
+This feature does not contact an identity provider or create backend notifications.
+
 Other useful commands:
 
 | Command                  | Purpose                                                                    |
