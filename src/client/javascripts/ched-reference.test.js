@@ -12,7 +12,7 @@ function createPage({ chedError = false, otherError = false } = {}) {
     selectedIndex: 1,
     addEventListener: vi.fn()
   }
-  let describedBy = 'ched-reference-guidance ched-reference-hint'
+  let describedBy = 'ched-reference-hint'
   if (chedError) {
     describedBy += ' ched-reference-error'
   }
@@ -126,7 +126,7 @@ describe('CHED reference reveal', () => {
     )
     expect(page.reference.setAttribute).toHaveBeenCalledWith(
       'aria-describedby',
-      'ched-reference-guidance ched-reference-hint'
+      'ched-reference-hint'
     )
     expect(page.item.remove).toHaveBeenCalledOnce()
     expect(page.summary.remove).not.toHaveBeenCalled()

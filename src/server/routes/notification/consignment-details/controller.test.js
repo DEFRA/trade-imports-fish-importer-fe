@@ -350,17 +350,35 @@ describe('Consignment details journey', () => {
     expect($('label[for="ched-reference"]').text().trim()).toBe(
       'CHED reference'
     )
-    expect(describedBy).toContain('ched-reference-guidance')
     expect(describedBy).toContain('ched-reference-hint')
+    expect(describedBy).not.toContain('ched-reference-guidance')
     expect($('#ched-reference-hint').text().trim()).toBe(
       'For example, CHEDP.XI.2025.1234567'
     )
-    const guidance = $('#ched-reference-container #ched-reference-guidance')
-    expect(guidance).toHaveLength(1)
-    expect(guidance.closest('details')).toHaveLength(0)
-    expect(guidance.text()).toContain(
-      'Get a CHED reference by submitting an import notification in IPAFFS'
+    const details = $(
+      '#ched-reference-container details#ched-reference-guidance'
     )
+    expect(details.hasClass('govuk-details')).toBe(true)
+    expect(details.find('.govuk-details__summary-text').text().trim()).toBe(
+      'How to get a CHED reference'
+    )
+    expect(
+      details.find('.govuk-details__text').text().replace(/\s+/g, ' ').trim()
+    ).toBe(
+      'Apply for a CHED reference through TRACES NT. Read the guidance on CHEDs in TRACES NT (opens in a new tab).'
+    )
+    expect(details.text()).not.toContain('IPAFFS')
+    const link = details.find('a')
+    expect(link).toHaveLength(1)
+    expect(link.text().trim()).toBe(
+      'guidance on CHEDs in TRACES NT (opens in a new tab)'
+    )
+    expect(link.attr('href')).toBe(
+      'https://webgate.ec.europa.eu/imsoc-guide/tracesnt-help/Content/en/documents-certificates/ched.html'
+    )
+    expect(link.attr('target')).toBe('_blank')
+    expect(link.attr('rel')).toBe('noreferrer noopener')
+    expect(link.hasClass('govuk-link')).toBe(true)
     expect(chedInput.attr('spellcheck')).toBe('false')
     expect(
       chedInput.closest('[data-module="app-ched-reference"]')
@@ -405,19 +423,27 @@ describe('Consignment details journey', () => {
     expect(response.headers.location).toBe('/notification/next-step')
   })
 
-  test('requires a CHED reference for Australia', async () => {
-    const response = await submit({ 'country-of-export': 'AU' })
-    const $ = cheerio.load(response.payload)
+  test.each(['AU', 'NO'])(
+    'requires a CHED reference for non-EU country %s',
+    async (country) => {
+      const response = await submit({ 'country-of-export': country })
+      const $ = cheerio.load(response.payload)
 
-    expect(response.statusCode).toBe(400)
-    expect($('#country-of-export').val()).toBe('AU')
-    expect($('#ched-reference-error').text()).toContain(
-      'Enter a CHED reference'
-    )
-    expect($('.govuk-error-summary__list a').attr('href')).toBe(
-      '#ched-reference'
-    )
-  })
+      expect(response.statusCode).toBe(400)
+      expect($('#country-of-export').val()).toBe(country)
+      expect(
+        $(`#country-of-export option[value="${country}"]`).attr(
+          'data-rest-of-world'
+        )
+      ).toBe('true')
+      expect($('#ched-reference-error').text()).toContain(
+        'Enter a CHED reference'
+      )
+      expect($('.govuk-error-summary__list a').attr('href')).toBe(
+        '#ched-reference'
+      )
+    }
+  )
 
   test.each([
     ['', 'Enter a CHED reference'],
@@ -451,12 +477,16 @@ describe('Consignment details journey', () => {
     }
   )
 
-  test.each(['AO', 'AU'])(
-    'accepts a valid CHED reference for rest-of-the-world country %s',
-    async (country) => {
+  test.each([
+    ['AO', '  chedp.xi.2025.1234567 '],
+    ['AU', 'CHEDP.XI.2025.1234567'],
+    ['NO', 'CHEDP.GB.2026.1234567']
+  ])(
+    'accepts a valid CHED reference for rest-of-the-world country %s: %j',
+    async (country, reference) => {
       const response = await submit({
         'country-of-export': country,
-        'ched-reference': '  chedp.xi.2025.1234567 '
+        'ched-reference': reference
       })
 
       expect(response.statusCode).toBe(303)

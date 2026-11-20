@@ -363,6 +363,7 @@ describe('Consignment details validation', () => {
 
     test.each([
       ['CHEDP.XI.2025.1234567', 'CHEDP.XI.2025.1234567'],
+      ['CHEDP.GB.2026.1234567', 'CHEDP.GB.2026.1234567'],
       ['  chedp.xi.2025.1234567 ', 'CHEDP.XI.2025.1234567'],
       ['ChedP.Gb.2026.0000001', 'CHEDP.GB.2026.0000001']
     ])(
