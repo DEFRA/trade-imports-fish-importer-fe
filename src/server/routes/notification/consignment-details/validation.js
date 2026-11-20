@@ -1,3 +1,9 @@
+import {
+  CHED_REFERENCE_PATTERN,
+  messages,
+  normaliseChedReference
+} from './ched-reference.js'
+import { findCountry, isRestOfWorld } from './countries.js'
 import { ports } from './ports.js'
 
 const dateFields = ['arrival-day', 'arrival-month', 'arrival-year']
@@ -151,9 +157,38 @@ function validateTime(values, date, today, currentMinute) {
   }
 }
 
+function validateCountryAndChed(values) {
+  const country = findCountry(values['country-of-export'].trim())
+  if (!country) {
+    return {
+      country: error(messages.countryMissing, ['country-of-export'])
+    }
+  }
+  if (!isRestOfWorld(country)) {
+    values['ched-reference'] = ''
+    return {}
+  }
+
+  const reference = normaliseChedReference(values['ched-reference'])
+  values['ched-reference'] = reference
+  if (!reference) {
+    return { ched: error(messages.chedMissing, ['ched-reference']) }
+  }
+  if (!CHED_REFERENCE_PATTERN.test(reference)) {
+    return { ched: error(messages.chedFormat, ['ched-reference']) }
+  }
+  return {}
+}
+
 export function validateConsignmentDetails(payload, now = new Date()) {
   const values = Object.fromEntries(
-    ['port', ...dateFields, ...timeFields].map((field) => [
+    [
+      'port',
+      ...dateFields,
+      ...timeFields,
+      'country-of-export',
+      'ched-reference'
+    ].map((field) => [
       field,
       typeof payload?.[field] === 'string' ? payload[field] : ''
     ])
@@ -169,7 +204,13 @@ export function validateConsignmentDetails(payload, now = new Date()) {
       ? error('Select a port of entry from the list', ['port'])
       : undefined,
     date: date.error,
-    time: validateTime(values, date.date, today, clock.hour * 60 + clock.minute)
+    time: validateTime(
+      values,
+      date.date,
+      today,
+      clock.hour * 60 + clock.minute
+    ),
+    ...validateCountryAndChed(values)
   }
 
   return { values, errors }
