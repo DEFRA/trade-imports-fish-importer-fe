@@ -716,7 +716,7 @@ describe('Test user sign-in', () => {
     expect(get).not.toHaveBeenCalled()
   })
 
-  test.each(['local', 'dev', 'test', 'prod', null])(
+  test.each(['local', 'dev', 'test', 'ext-test', 'prod', null])(
     'disabled mode keeps routes closed in environment %s',
     async (environment) => {
       config.set('auth.testUserSignInEnabled', false)
@@ -747,7 +747,7 @@ describe('Test user sign-in', () => {
     }
   )
 
-  test.each(['dev', 'test'])(
+  test.each(['dev', 'test', 'ext-test'])(
     'allows sign-in and sign-out in %s with production runtime settings and a service version',
     async (environment) => {
       config.set('cdpEnvironment', environment)
@@ -816,7 +816,7 @@ describe('Test user sign-in', () => {
     async (environment) => {
       config.set('cdpEnvironment', environment)
       await expect(createServer()).rejects.toThrow(
-        'Test user sign-in requires ENVIRONMENT to be local, dev or test'
+        'Test user sign-in requires ENVIRONMENT to be local, dev, test or ext-test'
       )
     }
   )

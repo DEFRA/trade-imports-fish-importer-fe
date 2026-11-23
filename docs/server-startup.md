@@ -9,7 +9,7 @@ The plugin registration sequence is request logger, tracing, CDP metrics, secure
 Authentication registers the default session strategy before application routes.
 When test user sign-in is enabled, it validates the CDP environment and synthetic
 user catalogue before startup can complete, and logs a warning that no identity
-provider is contacted. Environments other than `local`, `dev` and `test`, and
+provider is contacted. Environments other than `local`, `dev`, `test` and `ext-test`, and
 invalid catalogue records, reject startup.
 
 If an unhandled promise rejection occurs, the entry point logs the rejection and sets `process.exitCode` to `1`.

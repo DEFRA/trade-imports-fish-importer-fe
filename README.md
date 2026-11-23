@@ -94,13 +94,14 @@ use predefined identities without contacting an identity provider.
 - **Local development:** `npm run dev` and `npm run dev:debug` enable it for
   convenience by setting `ENVIRONMENT=local` and `TEST_USER_SIGN_IN_ENABLED=true`.
   No `.env` setup is required.
-- **Deployed dev/test:** Disabled by default. To enable it, set
+- **Deployed dev/test/ext-test:** Disabled by default. To enable it, set
   `TEST_USER_SIGN_IN_ENABLED=true` in the service's environment-specific
   [dev](https://github.com/DEFRA/cdp-app-config/blob/main/services/trade-imports-fish-importer-fe/dev/trade-imports-fish-importer-fe.env)
-  or [test](https://github.com/DEFRA/cdp-app-config/blob/main/services/trade-imports-fish-importer-fe/test/trade-imports-fish-importer-fe.env)
+  [test](https://github.com/DEFRA/cdp-app-config/blob/main/services/trade-imports-fish-importer-fe/test/trade-imports-fish-importer-fe.env)
+  or [ext-test](https://github.com/DEFRA/cdp-app-config/blob/main/services/trade-imports-fish-importer-fe/ext-test/trade-imports-fish-importer-fe.env)
   configuration and redeploy. Do not add it to shared defaults or production.
 
-Test user sign-in is only allowed when `ENVIRONMENT` is `local`, `dev` or `test`.
+Test user sign-in is only allowed when `ENVIRONMENT` is `local`, `dev`, `test` or `ext-test`.
 Enabling it in any other environment, including production, prevents startup.
 
 When enabled, opening a protected page (such as <http://localhost:3000/>) without

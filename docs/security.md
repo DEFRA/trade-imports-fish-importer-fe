@@ -19,7 +19,7 @@ for the cookie preference form and request behavior.
 Application routes require a server-side session by default. The current test
 identity provider is an explicitly enabled, non-production alternative, not real
 identity verification or DEFRA SSO. Enabling it when `ENVIRONMENT` is not
-`local`, `dev` or `test` rejects startup (`ENVIRONMENT` defaults to `local` when
+`local`, `dev`, `test` or `ext-test` rejects startup (`ENVIRONMENT` defaults to `local` when
 unset). Disabling it does not make protected application routes public.
 
 The browser selects an allowlisted test user ID; names and organisation details

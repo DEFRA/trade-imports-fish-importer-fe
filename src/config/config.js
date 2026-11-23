@@ -149,7 +149,7 @@ export const config = convict({
   },
   auth: {
     testUserSignInEnabled: {
-      doc: 'Enable test user sign-in only in the local, dev and test environments',
+      doc: 'Enable test user sign-in only in the local, dev, test and ext-test environments',
       format: Boolean,
       default: false,
       env: 'TEST_USER_SIGN_IN_ENABLED'

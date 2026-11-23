@@ -50,7 +50,7 @@ are invalidated; users must sign in again.
 To switch users, visit the unlinked `/dev/identity` page, check the selected
 identity, role and organisation and use its CSRF-protected Sign out button, then select another user.
 This page requires a session and exists only when test user sign-in is enabled
-in `local`, `dev` or `test`. There is no header sign-out control.
+in `local`, `dev`, `test` or `ext-test`. There is no header sign-out control.
 
 To run without the test identity provider, use
 `TEST_USER_SIGN_IN_ENABLED=false npm run server:watch`. Application pages remain

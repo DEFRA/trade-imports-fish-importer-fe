@@ -31,10 +31,10 @@ Logging and tracing settings are described in [Logging and observability](loggin
 | `ENVIRONMENT`               | `local` | CDP environment, exposed as `cdpEnvironment`.                                          |
 | `TEST_USER_SIGN_IN_ENABLED` | `false` | Enables the synthetic identity provider and its sign-in, sign-out and identity routes. |
 
-When test user sign-in is enabled, `ENVIRONMENT` must be exactly `local`, `dev`
-or `test`; other values reject startup. When `ENVIRONMENT` is unset, config
+When test user sign-in is enabled, `ENVIRONMENT` must be exactly `local`, `dev`,
+`test` or `ext-test`; other values reject startup. When `ENVIRONMENT` is unset, config
 defaults it to `local`.
-`NODE_ENV=production` remains valid for deployed dev/test and continues to
+`NODE_ENV=production` remains valid for deployed dev/test/ext-test and continues to
 control secure-cookie and Redis defaults, not permission to enable test sign-in.
 The development scripts explicitly set `ENVIRONMENT=local` and
 `TEST_USER_SIGN_IN_ENABLED=true`.

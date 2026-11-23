@@ -7,7 +7,7 @@ import {
   getTestUsers
 } from '#/server/common/helpers/test-users.js'
 
-const testUserSignInEnvironments = new Set(['local', 'dev', 'test'])
+const testUserSignInEnvironments = new Set(['local', 'dev', 'test', 'ext-test'])
 const testUserSignInEnabledKey = 'auth.testUserSignInEnabled'
 const noRedirectUrl = ''
 
@@ -87,7 +87,7 @@ export const authentication = {
         !testUserSignInEnvironments.has(config.get('cdpEnvironment'))
       ) {
         throw new Error(
-          'Test user sign-in requires ENVIRONMENT to be local, dev or test. Production, missing and unrecognised environments are not permitted.'
+          'Test user sign-in requires ENVIRONMENT to be local, dev, test or ext-test. Production, missing and unrecognised environments are not permitted.'
         )
       }
 
