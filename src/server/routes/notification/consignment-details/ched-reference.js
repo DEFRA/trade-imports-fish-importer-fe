@@ -1,5 +1,5 @@
 // Working assumption: all FIS CHEDs are CHED-P, for example CHEDP.GB.2026.1234567
-export const CHED_REFERENCE_PATTERN = /^CHEDP\.[A-Z]{2}\.\d{4}\.\d{7}$/
+export const CHED_REFERENCE_PATTERN = /^CHEDP\.GB\.\d{4}\.\d{7}$/
 
 // Provisional text (IPR1-D26)
 export const messages = {

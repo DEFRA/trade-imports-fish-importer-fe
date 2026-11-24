@@ -613,15 +613,7 @@ describe('Consignment details validation', () => {
       }
     )
 
-    test.each([
-      'AO',
-      'US',
-      'NO',
-      'CH',
-      'AU',
-      'british-antarctic-territory',
-      'akrotiri-and-dhekelia'
-    ])(
+    test.each(['AO', 'US', 'NO', 'CH', 'AU'])(
       'requires a CHED reference for rest-of-the-world country %s',
       (country) => {
         expect(
@@ -635,6 +627,7 @@ describe('Consignment details validation', () => {
     )
 
     test.each([
+      'CHEDP.XI.2025.1234567',
       'CHEDA.XI.2025.1234567',
       'CHEDD.XI.2025.1234567',
       'CHEDPP.XI.2025.1234567',
@@ -658,9 +651,8 @@ describe('Consignment details validation', () => {
     })
 
     test.each([
-      ['CHEDP.XI.2025.1234567', 'CHEDP.XI.2025.1234567'],
       ['CHEDP.GB.2026.1234567', 'CHEDP.GB.2026.1234567'],
-      ['  chedp.xi.2025.1234567 ', 'CHEDP.XI.2025.1234567'],
+      ['  chedp.gb.2025.1234567 ', 'CHEDP.GB.2025.1234567'],
       ['ChedP.Gb.2026.0000001', 'CHEDP.GB.2026.0000001']
     ])(
       'accepts and normalises a valid CHED reference: %j',

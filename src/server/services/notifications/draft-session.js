@@ -100,7 +100,7 @@ export async function saveDraft(request, transportMethod) {
   return notification
 }
 
-export async function saveArrival(request, arrival) {
+export async function saveConsignmentDetails(request, details) {
   const draft = currentDraft(request)
   if (!draft) {
     throw new Error('No active notification journey')
@@ -112,7 +112,7 @@ export async function saveArrival(request, arrival) {
   remember(request, existing)
   const notification = await notificationsClient.update(request, draft.id, {
     organisationId: organisationOf(request),
-    notification: { arrival }
+    notification: details
   })
   if (notification.reference !== existing.reference) {
     throw new Error('Draft reference has unexpectedly changed during save')

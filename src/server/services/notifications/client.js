@@ -30,6 +30,13 @@ const notificationSchema = Joi.object({
         .pattern(/^([01]\d|2[0-3]):[0-5]\d$/)
         .required(),
       expectedArrivalAt: Joi.string().isoDate().strict().required()
+    }).unknown(true),
+    countryOfExport: Joi.string()
+      .pattern(/^[A-Z]{2}$/)
+      .strict(),
+    exportRegion: Joi.string().valid('EU', 'REST_OF_WORLD').strict(),
+    ched: Joi.object({
+      reference: Joi.string().allow('').strict()
     }).unknown(true)
   })
     .unknown(true)
@@ -67,16 +74,28 @@ function verifyNotification(notification, id, payload) {
     throw new Error('Notification API returned a different draft identity')
   }
   if (payload) {
+    const sentDetails = payload.notification
+    const returnedDetails = notification.notification
     const detailsDiffer = Object.entries(payload.notification).some(
-      ([section, fields]) =>
-        Object.entries(fields).some(
-          ([field, value]) =>
-            notification.notification[section]?.[field] !== value
+      ([section, fields]) => {
+        const returned = notification.notification[section]
+        if (typeof fields !== 'object' || fields === null) {
+          return returned !== fields
+        }
+        return Object.entries(fields).some(
+          ([field, value]) => returned?.[field] !== value
         )
+      }
     )
+    const exportDetailsDiffer =
+      sentDetails.countryOfExport !== undefined &&
+      (returnedDetails.exportRegion !==
+        (sentDetails.ched ? 'REST_OF_WORLD' : 'EU') ||
+        (!sentDetails.ched && returnedDetails.ched !== undefined))
     if (
       notification.organisationId !== payload.organisationId ||
-      detailsDiffer
+      detailsDiffer ||
+      exportDetailsDiffer
     ) {
       throw new Error(
         'Notification API response does not match the saved details'

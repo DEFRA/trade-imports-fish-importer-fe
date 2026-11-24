@@ -267,7 +267,8 @@ export function validateConsignmentDetails(payload, now = new Date()) {
   }
   Object.assign(errors, validateCountryAndChed(values))
 
-  const arrival = Object.values(errors).some(Boolean)
+  const invalid = Object.values(errors).some(Boolean)
+  const arrival = invalid
     ? undefined
     : {
         portOfEntry: port,
@@ -275,5 +276,14 @@ export function validateConsignmentDetails(payload, now = new Date()) {
         expectedArrivalTime: `${values['arrival-hour'].trim().padStart(2, '0')}:${values['arrival-minute'].trim().padStart(2, '0')}`
       }
 
-  return { values, errors, arrival }
+  const exportDetails = invalid
+    ? undefined
+    : {
+        countryOfExport: values['country-of-export'].trim(),
+        ...(values['ched-reference']
+          ? { ched: { reference: values['ched-reference'] } }
+          : {})
+      }
+
+  return { values, errors, arrival, exportDetails }
 }

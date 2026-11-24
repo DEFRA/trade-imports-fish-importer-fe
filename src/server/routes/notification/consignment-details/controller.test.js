@@ -64,9 +64,16 @@ describe('Consignment details journey', () => {
     notificationsClient.update.mockImplementation(
       async (_request, id, payload) => {
         const existing = drafts.get(id)
+        const content = { ...existing.notification, ...payload.notification }
+        if (
+          payload.notification.countryOfExport &&
+          !payload.notification.ched
+        ) {
+          delete content.ched
+        }
         const notification = {
           ...existing,
-          notification: { ...existing.notification, ...payload.notification },
+          notification: content,
           updatedAt: '2026-11-19T14:30:45.000Z'
         }
         drafts.set(id, notification)
@@ -466,11 +473,148 @@ describe('Consignment details journey', () => {
             portOfEntry: 'DOVER',
             expectedArrivalDate: '2027-09-05',
             expectedArrivalTime: '09:05'
-          }
+          },
+          countryOfExport: 'FR'
         }
       }
     )
     expect(notificationsClient.create).toHaveBeenCalledTimes(1)
+  })
+
+  test('saves and restores arrival, country and CHED for a rest-of-world consignment', async () => {
+    const jar = await startDraft()
+    const response = await postArrival(jar, {
+      'country-of-export': 'AO',
+      'ched-reference': ' chedp.gb.2026.1234567 '
+    })
+
+    expect(response.statusCode).toBe(303)
+    expect(notificationsClient.update.mock.lastCall[2]).toEqual({
+      organisationId: auth.credentials.organisationId,
+      notification: {
+        arrival: {
+          portOfEntry: 'DOVER',
+          expectedArrivalDate: '2026-11-20',
+          expectedArrivalTime: '09:30'
+        },
+        countryOfExport: 'AO',
+        ched: { reference: 'CHEDP.GB.2026.1234567' }
+      }
+    })
+
+    const $ = cheerio.load((await visitArrival(jar)).payload)
+    expect($('#country-of-export').val()).toBe('AO')
+    expect($('#ched-reference').val()).toBe('CHEDP.GB.2026.1234567')
+    expect($('#port').val()).toBe('DOVER')
+  })
+
+  test.each(['british-antarctic-territory', 'akrotiri-and-dhekelia'])(
+    'does not offer or accept the unsupported territory %s',
+    async (country) => {
+      const jar = await startDraft()
+      const page = cheerio.load((await visitArrival(jar)).payload)
+      expect(
+        page(`#country-of-export option[value="${country}"]`)
+      ).toHaveLength(0)
+
+      const response = await postArrival(jar, {
+        'country-of-export': country,
+        'ched-reference': 'CHEDP.GB.2026.1234567'
+      })
+      expect(response.statusCode).toBe(400)
+      expect(notificationsClient.update).not.toHaveBeenCalled()
+    }
+  )
+
+  test('shows a linked format error for a CHED with a non-GB code', async () => {
+    const response = await submit({
+      'country-of-export': 'AO',
+      'ched-reference': 'chedp.xi.2026.1234567'
+    })
+    const $ = cheerio.load(response.payload)
+
+    expect(response.statusCode).toBe(400)
+    expect($('.govuk-error-summary__list a').attr('href')).toBe(
+      '#ched-reference'
+    )
+    expect($('#ched-reference-error').text()).toContain(
+      'Enter a CHED reference in the correct format'
+    )
+    expect($('#ched-reference').val()).toBe('CHEDP.XI.2026.1234567')
+    expect(notificationsClient.update).not.toHaveBeenCalled()
+  })
+
+  test('changing a saved rest-of-world country to EU removes the CHED', async () => {
+    const jar = await startDraft()
+    await postArrival(jar, {
+      'country-of-export': 'AO',
+      'ched-reference': 'CHEDP.GB.2026.1234567'
+    })
+
+    const response = await postArrival(jar, {
+      'country-of-export': 'FR',
+      'ched-reference': 'CHEDP.GB.2026.1234567'
+    })
+
+    expect(response.statusCode).toBe(303)
+    expect(notificationsClient.update.mock.lastCall[2].notification).toEqual({
+      arrival: {
+        portOfEntry: 'DOVER',
+        expectedArrivalDate: '2026-11-20',
+        expectedArrivalTime: '09:30'
+      },
+      countryOfExport: 'FR'
+    })
+    const $ = cheerio.load((await visitArrival(jar)).payload)
+    expect($('#country-of-export').val()).toBe('FR')
+    expect($('#ched-reference').val()).toBe('')
+  })
+
+  test('prefills an old CHED without arrival and requires its correction on submit', async () => {
+    const jar = await startDraft()
+    const id = drafts.keys().next().value
+    const draft = drafts.get(id)
+    drafts.set(id, {
+      ...draft,
+      notification: {
+        ...draft.notification,
+        countryOfExport: 'AO',
+        ched: { reference: 'CHEDP.XI.2026.1234567' }
+      }
+    })
+
+    const page = cheerio.load((await visitArrival(jar)).payload)
+    expect(page('#country-of-export').val()).toBe('AO')
+    expect(page('#ched-reference').val()).toBe('CHEDP.XI.2026.1234567')
+    expect(page('#port').val()).toBe('')
+
+    const response = await postArrival(jar, {
+      'country-of-export': 'AO',
+      'ched-reference': 'CHEDP.XI.2026.1234567'
+    })
+    expect(response.statusCode).toBe(400)
+    expect(
+      cheerio.load(response.payload)('#ched-reference-error').text()
+    ).toContain('Enter a CHED reference in the correct format')
+    expect(notificationsClient.update).not.toHaveBeenCalled()
+  })
+
+  test('does not silently select a different country for an unknown saved code', async () => {
+    const jar = await startDraft()
+    const id = drafts.keys().next().value
+    const draft = drafts.get(id)
+    drafts.set(id, {
+      ...draft,
+      notification: {
+        ...draft.notification,
+        countryOfExport: 'ZZ',
+        ched: { reference: 'CHEDP.GB.2026.1234567' }
+      }
+    })
+
+    const $ = cheerio.load((await visitArrival(jar)).payload)
+    expect($('#country-of-export').val()).toBe('')
+    expect($('#ched-reference').val()).toBe('CHEDP.GB.2026.1234567')
   })
 
   test('shows an error page rather than redirecting when the API rejects an arrival patch', async () => {
@@ -668,7 +812,9 @@ describe('Consignment details journey', () => {
         )
         expectNoSession(response)
       } else {
-        expect(response.headers.location).toBe('/notification/next-step')
+        expect(response.headers.location).toBe(
+          '/notification/commodity-details'
+        )
       }
     }
   )
@@ -735,7 +881,7 @@ describe('Consignment details journey', () => {
     const response = await postArrival(jar, { 'arrival-month': 'November' })
 
     expect(response.statusCode).toBe(303)
-    expect(response.headers.location).toBe('/notification/next-step')
+    expect(response.headers.location).toBe('/notification/commodity-details')
     expect(notificationsClient.update).toHaveBeenCalledWith(
       expect.any(Object),
       expect.any(String),
@@ -746,25 +892,11 @@ describe('Consignment details journey', () => {
             portOfEntry: 'DOVER',
             expectedArrivalDate: '2026-11-20',
             expectedArrivalTime: '09:30'
-          }
+          },
+          countryOfExport: 'FR'
         }
       }
     )
-
-    const destination = await server.inject({
-      method: 'GET',
-      url: response.headers.location,
-      auth
-    })
-    const $ = cheerio.load(destination.payload)
-
-    expect(destination.statusCode).toBe(200)
-    expect($('head > title').text().trim()).toBe(
-      `Next step | ${config.get('serviceName')}`
-    )
-    expect($('header').length).toBeGreaterThan(0)
-    expect($('footer').length).toBeGreaterThan(0)
-    expect($('a.govuk-back-link').attr('href')).toBe(url)
 
     const back = cheerio.load((await visitArrival(jar)).payload)
 
@@ -847,7 +979,7 @@ describe('Consignment details journey', () => {
     expect($('#ched-reference-container').attr('hidden')).toBeUndefined()
   })
 
-  test('includes the prototype country and territory choices with unique values', async () => {
+  test('includes prototype country choices with unique values', async () => {
     const response = await visitArrival(await startDraft())
     const $ = cheerio.load(response.payload)
     const options = $('#country-of-export option').slice(1)
@@ -860,12 +992,7 @@ describe('Consignment details journey', () => {
       ['BR', 'Brazil'],
       ['JP', 'Japan'],
       ['NZ', 'New Zealand'],
-      ['NR', 'Naoero'],
-      ['british-antarctic-territory', 'British Antarctic Territory'],
-      [
-        'akrotiri-and-dhekelia',
-        'The Sovereign Base Areas of Akrotiri and Dhekelia'
-      ]
+      ['NR', 'Naoero']
     ]) {
       const option = $(`#country-of-export option[value="${value}"]`)
       expect(option).toHaveLength(1)
@@ -881,7 +1008,7 @@ describe('Consignment details journey', () => {
     })
 
     expect(response.statusCode).toBe(303)
-    expect(response.headers.location).toBe('/notification/next-step')
+    expect(response.headers.location).toBe('/notification/commodity-details')
   })
 
   test.each(['AU', 'NO'])(
@@ -939,8 +1066,8 @@ describe('Consignment details journey', () => {
   )
 
   test.each([
-    ['AO', '  chedp.xi.2025.1234567 '],
-    ['AU', 'CHEDP.XI.2025.1234567'],
+    ['AO', '  chedp.gb.2025.1234567 '],
+    ['AU', 'CHEDP.GB.2025.1234567'],
     ['NO', 'CHEDP.GB.2026.1234567']
   ])(
     'accepts a valid CHED reference for rest-of-the-world country %s: %j',
@@ -951,7 +1078,7 @@ describe('Consignment details journey', () => {
       })
 
       expect(response.statusCode).toBe(303)
-      expect(response.headers.location).toBe('/notification/next-step')
+      expect(response.headers.location).toBe('/notification/commodity-details')
     }
   )
 

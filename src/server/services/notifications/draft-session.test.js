@@ -2,7 +2,7 @@ import {
   currentDraft,
   loadDraft,
   loadSavedDraft,
-  saveArrival,
+  saveConsignmentDetails,
   saveDraft
 } from './draft-session.js'
 import { notificationsClient } from './client.js'
@@ -69,7 +69,7 @@ describe('notification draft session', () => {
     const id = currentDraft(request).id
 
     expect(await loadSavedDraft(request)).toBeNull()
-    expect(await saveArrival(request, {})).toBeNull()
+    expect(await saveConsignmentDetails(request, {})).toBeNull()
     expect(currentDraft(request)).toMatchObject({ id, saved: false })
     expect(notificationsClient.update).not.toHaveBeenCalled()
     expect(notificationsClient.create).not.toHaveBeenCalled()
@@ -97,7 +97,9 @@ describe('notification draft session', () => {
     notificationsClient.find.mockResolvedValue(saved(id))
     notificationsClient.update.mockResolvedValue(response)
 
-    await expect(saveArrival(request, arrival)).resolves.toEqual(response)
+    await expect(saveConsignmentDetails(request, { arrival })).resolves.toEqual(
+      response
+    )
 
     expect(notificationsClient.find).toHaveBeenLastCalledWith(request, id)
     expect(notificationsClient.update).toHaveBeenCalledExactlyOnceWith(

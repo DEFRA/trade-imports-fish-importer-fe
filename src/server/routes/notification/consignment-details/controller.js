@@ -2,7 +2,7 @@ import { statusCodes } from '#/server/common/constants/status-codes.js'
 import {
   currentDraft,
   loadSavedDraft,
-  saveArrival
+  saveConsignmentDetails
 } from '#/server/services/notifications/draft-session.js'
 import { countries, isRestOfWorld } from './countries.js'
 import { ports } from './ports.js'
@@ -44,14 +44,20 @@ function pageModel({ values = {}, errors = {} } = {}) {
   }
 }
 
-function arrivalValues(notification) {
-  const arrival = notification?.notification?.arrival
+function consignmentValues(notification) {
+  const content = notification?.notification
+  const values = {
+    'country-of-export': content?.countryOfExport ?? '',
+    'ched-reference': content?.ched?.reference ?? ''
+  }
+  const arrival = content?.arrival
   if (!arrival) {
-    return {}
+    return values
   }
   const [year, month, day] = arrival.expectedArrivalDate.split('-')
   const [hour, minute] = arrival.expectedArrivalTime.split(':')
   return {
+    ...values,
     port: arrival.portOfEntry,
     'arrival-day': String(Number(day)),
     'arrival-month': String(Number(month)),
@@ -69,7 +75,7 @@ export const consignmentDetailsController = {
     }
     return h.view(
       'notification/consignment-details/index',
-      pageModel({ values: arrivalValues(notification) })
+      pageModel({ values: consignmentValues(notification) })
     )
   }
 }
@@ -93,7 +99,10 @@ export const submitConsignmentDetailsController = {
         .view('notification/consignment-details/index', model)
         .code(statusCodes.badRequest)
     }
-    const notification = await saveArrival(request, result.arrival)
+    const notification = await saveConsignmentDetails(request, {
+      arrival: result.arrival,
+      ...result.exportDetails
+    })
     if (!notification) {
       return h
         .view('error/index', {
@@ -104,6 +113,8 @@ export const submitConsignmentDetailsController = {
         })
         .code(statusCodes.badRequest)
     }
-    return h.redirect('/notification/next-step').code(statusCodes.seeOther)
+    return h
+      .redirect('/notification/commodity-details')
+      .code(statusCodes.seeOther)
   }
 }

@@ -60,35 +60,33 @@ Validation runs on the frontend server using the
 [GOV.UK date-input guidance](https://design-system.service.gov.uk/components/date-input/),
 including real dates, four-digit years and numeric, full or abbreviated English
 months. Hours are 0-23 and minutes are 0-59; both accept one or two digits.
-Arrival must be after the current minute in `Europe/London`, with no past dates.
+Arrival must be at least two hours and no more than one year in the future.
 The fixed date hint is retained from the design, even though its example is now
 in the past.
 
-Entered consignment values are redisplayed on validation errors only. A successful
-consignment POST redirects to `/notification/next-step`, a temporary empty page
-with the shared header, footer and Back link to consignment details. Despite the
-**Save and continue** button text, the page saves only arrival details to the
-existing notification draft. The country of export and CHED reference are
-validated but are not persisted. Returning from Next step loads saved arrival
-details from the backend.
+Entered consignment values are redisplayed on validation errors. A successful
+consignment POST saves the arrival, country of export and any required CHED
+reference to the existing draft and redirects to `/notification/commodity-details`.
+That route is not yet registered and returns 404 until the commodity details page
+is integrated. Returning to consignment details loads the saved details from the
+backend.
 
 The additional details section asks for the country of export. Countries are
 temporary seeded data in
 [countries.json](src/server/routes/notification/consignment-details/countries.json)
-until MDM provides them. The options match the current prototype, and territories
-without an ISO country code have temporary identifiers. A country is rest of the
-world when it is outside both the EU-27 and the SPS agreement (`eu27` and
-`spsAgreement` flags). The non-EU SPS flags are provisional pending confirmation.
-For rest-of-the-world countries a CHED reference is required. It is trimmed,
-uppercased and checked against the CHED-P format in
+until MDM provides them. The two territories without two-letter codes are
+temporarily unavailable. The prototype treats all countries outside the EU-27
+as rest of the world; the SPS exemption is deferred until MDM. A CHED reference
+is required for rest-of-the-world countries. It is trimmed,
+uppercased and checked against the fixed `CHEDP.GB.YYYY.NNNNNNN` format in
 [ched-reference.js](src/server/routes/notification/consignment-details/ched-reference.js),
 which also holds the provisional error text. CHED references are ignored for
 EU-27 countries. The CHED field is always rendered and
 [a client script](src/client/javascripts/ched-reference.js) hides it unless a
-rest-of-the-world country is selected. If an EU or SPS country is selected, the
+rest-of-the-world country is selected. If an EU country is selected, the
 script clears the reference and its errors. Without JavaScript the field stays
 visible and the server decides whether it is needed. The CHED reference is not
-checked against any other service or persisted.
+checked against any other service.
 
 ## Server-side Caching
 
