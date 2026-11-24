@@ -26,8 +26,17 @@ describe('notification draft session', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     const store = new Map()
+    const savedDrafts = new Map()
     request = {
       auth: { credentials: { organisationId } },
+      server: {
+        app: {
+          savedNotificationDrafts: {
+            get: async (id) => savedDrafts.get(id),
+            set: async (id, value) => savedDrafts.set(id, value)
+          }
+        }
+      },
       yar: {
         get: (key) => store.get(key),
         set: (key, value) => store.set(key, value)
@@ -65,12 +74,7 @@ describe('notification draft session', () => {
       id,
       { organisationId, transportMethod: 'road-vehicle' }
     )
-    expect(currentDraft(request)).toEqual({
-      id,
-      saved: true,
-      reference: 'GBN-FIS-26-AXN04',
-      organisationId
-    })
+    expect(currentDraft(request).id).toBe(id)
   })
 
   test('recovers a committed save after a lost response, including a changed selection', async () => {
@@ -94,7 +98,6 @@ describe('notification draft session', () => {
     await loadDraft(request)
     notificationsClient.find.mockResolvedValue(saved(currentDraft(request).id))
     expect((await loadDraft(request)).transportMethod).toBe('air-freight')
-    expect(currentDraft(request).saved).toBe(true)
   })
 
   test('a failed creation retry keeps its original key', async () => {
@@ -127,12 +130,6 @@ describe('notification draft session', () => {
       new Error('Notification API PUT failed with status 404')
     )
     await expect(saveDraft(request, 'road-vehicle')).rejects.toThrow('404')
-    expect(currentDraft(request)).toEqual({
-      id,
-      saved: true,
-      reference: 'GBN-FIS-26-AXN04',
-      organisationId
-    })
     await expect(saveDraft(request, 'road-vehicle')).rejects.toThrow(
       'could not be found'
     )

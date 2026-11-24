@@ -71,6 +71,12 @@ export async function createServer() {
     router // Register all the controllers/routes defined in src/server/router.js
   ])
 
+  server.app.savedNotificationDrafts = server.cache({
+    cache: config.get('session.cache.name'),
+    segment: 'saved-notification-drafts',
+    expiresIn: config.get('session.cache.ttl')
+  })
+
   server.ext('onPreResponse', catchAll)
 
   return server

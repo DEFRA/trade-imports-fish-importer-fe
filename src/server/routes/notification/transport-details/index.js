@@ -4,6 +4,9 @@ import {
 } from './controller.js'
 import { transportDetailsModel, transportDetailsSchema } from './model.js'
 import { statusCodes } from '#/server/common/constants/status-codes.js'
+import { currentDraft } from '#/server/services/notifications/draft-session.js'
+
+const path = '/notification/transport-details'
 
 export const transportDetails = {
   plugin: {
@@ -12,22 +15,27 @@ export const transportDetails = {
       server.route([
         {
           method: 'GET',
-          path: '/notification/transport-details',
+          path,
           ...getTransportDetailsController
         },
         {
           method: 'POST',
-          path: '/notification/transport-details',
+          path,
           options: {
             validate: {
               payload: transportDetailsSchema,
               failAction(request, h) {
+                const draft = currentDraft(request)
+                if (draft && draft.id !== request.payload?.journeyId) {
+                  return h.redirect(path).code(statusCodes.seeOther).takeover()
+                }
                 return h
                   .view(
                     'notification/transport-details/index',
                     transportDetailsModel(
                       request.payload?.transportMethod,
-                      true
+                      true,
+                      draft?.id
                     )
                   )
                   .code(statusCodes.badRequest)

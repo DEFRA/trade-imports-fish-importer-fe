@@ -34,6 +34,6 @@ existing sign-in redirect or HTTP 401 behaviour and invalid-cookie clearing.
 
 Redis uses port 6379 and database 0. `USE_SINGLE_INSTANCE_CACHE` selects a Redis instance or a cluster; TLS, username, password and key prefix are configurable. See [Configuration](configuration.md) for names and defaults.
 
-The notification journey stores its draft identifier in the session under `notificationDraft`; see [Notification journey](notification-journey.md).
+The notification journey stores its current draft identifier under `notificationDraft` and previously used Start request identifiers under `notificationStartedJourneys`. A separate `saved-notification-drafts` cache segment tracks persisted draft references so asynchronous loads and saves do not rewrite the browser session; see [Notification journey](notification-journey.md).
 
 The Redis client logs connection and error events. The server configures the cache engine during startup; see [Server startup](server-startup.md).

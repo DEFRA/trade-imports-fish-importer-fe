@@ -88,11 +88,14 @@
       <p class="govuk-body">You must check that all information is complete and correct before submitting your notification. If information is missing or incorrect, you can update it before submission.</p>
       <p class="govuk-body">Providing inaccurate information may result in delays to your consignment and could lead to enforcement action.</p>
 
-      {{ govukButton({
-        text: "Start now",
-        href: "/notification/transport-details",
-        isStartButton: true
-      }) }}
+      <form method="post" action="/notification/guidance">
+        <input type="hidden" name="crumb" value="{{ crumb }}">
+        <input type="hidden" name="journeyId" value="{{ journeyId }}">
+        {{ govukButton({
+          text: "Start now",
+          isStartButton: true
+        }) }}
+      </form>
     </div>
 
     <div class="govuk-grid-column-one-third">

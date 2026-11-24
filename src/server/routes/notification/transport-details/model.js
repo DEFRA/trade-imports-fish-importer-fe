@@ -5,12 +5,13 @@ import { transportMethods } from '#/server/common/constants/transport-methods.js
 const selectionError = 'Select how the consignment is being transported'
 
 export const transportDetailsSchema = Joi.object({
+  journeyId: Joi.string().uuid().required(),
   transportMethod: Joi.string()
     .valid(...transportMethods.map(({ value }) => value))
     .required()
 })
 
-export function transportDetailsModel(selected, invalid = false) {
+export function transportDetailsModel(selected, invalid, journeyId) {
   const radios = {
     idPrefix: 'transportMethod',
     name: 'transportMethod',
@@ -30,6 +31,7 @@ export function transportDetailsModel(selected, invalid = false) {
   }
   return {
     pageTitle: invalid ? 'Error: Transport details' : 'Transport details',
+    journeyId,
     radios,
     errorSummary: invalid
       ? {
