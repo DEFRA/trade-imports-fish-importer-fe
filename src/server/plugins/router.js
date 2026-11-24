@@ -5,6 +5,7 @@ import { about } from '../routes/about/index.js'
 import { guidance } from '../routes/notification/guidance/index.js'
 import { testUserAuth } from '../routes/auth/index.js'
 import { consignmentDetails } from '../routes/notification/consignment-details/index.js'
+import { nextStep } from '../routes/notification/next-step/index.js'
 import { health } from '../routes/health/index.js'
 import { cookies } from '../routes/cookies/controller.js'
 import { serveStaticFiles } from './serve-static-files.js'
@@ -27,7 +28,8 @@ export const router = {
         about,
         guidance,
         transportDetails,
-        consignmentDetails
+        consignmentDetails,
+        nextStep
       ])
 
       if (config.get('auth.testUserSignInEnabled')) {

@@ -146,6 +146,182 @@ describe('notificationsClient', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(arrivalPayload)
   })
 
+  test('rejects a saved country that only starts with the submitted code', async () => {
+    const body = {
+      organisationId: 'represented-importer',
+      notification: {
+        countryOfExport: 'AO',
+        ched: { reference: 'CHEDP.GB.2026.1234567' }
+      }
+    }
+    fetchMock.mockResolvedValue(
+      Response.json({
+        ...notification,
+        notification: {
+          ...notification.notification,
+          countryOfExport: 'AOX',
+          exportRegion: 'REST_OF_WORLD',
+          ched: body.notification.ched
+        }
+      })
+    )
+
+    await expect(
+      notificationsClient.update(request, id, body)
+    ).rejects.toThrow()
+  })
+
+  test.each([undefined, 'EU'])(
+    'rejects a rest-of-world save response with region %s',
+    async (exportRegion) => {
+      const body = {
+        organisationId: 'represented-importer',
+        notification: {
+          countryOfExport: 'AO',
+          ched: { reference: 'CHEDP.GB.2026.1234567' }
+        }
+      }
+      fetchMock.mockResolvedValue(
+        Response.json({
+          ...notification,
+          notification: {
+            ...notification.notification,
+            ...body.notification,
+            exportRegion
+          }
+        })
+      )
+
+      await expect(
+        notificationsClient.update(request, id, body)
+      ).rejects.toThrow()
+    }
+  )
+
+  test('rejects a saved CHED reference that is not a string', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({
+        ...notification,
+        notification: {
+          ...notification.notification,
+          countryOfExport: 'AO',
+          exportRegion: 'REST_OF_WORLD',
+          ched: { reference: 1234567 }
+        }
+      })
+    )
+
+    await expect(notificationsClient.find(request, id)).rejects.toThrow()
+  })
+
+  test.each([
+    {},
+    { reference: 'CHEDP.XI.2026.1234567', additional: 'retained' }
+  ])(
+    'reads an incomplete or older saved CHED without dropping fields',
+    async (ched) => {
+      const response = {
+        ...notification,
+        notification: {
+          ...notification.notification,
+          countryOfExport: 'AO',
+          exportRegion: 'REST_OF_WORLD',
+          ched
+        }
+      }
+      fetchMock.mockResolvedValue(Response.json(response))
+      await expect(notificationsClient.find(request, id)).resolves.toEqual(
+        response
+      )
+    }
+  )
+
+  test.each([
+    ['FR', undefined, 'EU', undefined],
+    [
+      'AO',
+      { reference: 'CHEDP.GB.2026.1234567' },
+      'REST_OF_WORLD',
+      { reference: 'CHEDP.GB.2026.1234567' }
+    ]
+  ])(
+    'accepts a matching export details save for %s',
+    async (country, sentChed, region, savedChed) => {
+      const body = {
+        organisationId: 'represented-importer',
+        notification: {
+          countryOfExport: country,
+          ...(sentChed ? { ched: sentChed } : {})
+        }
+      }
+      const response = {
+        ...notification,
+        notification: {
+          ...notification.notification,
+          countryOfExport: country,
+          exportRegion: region,
+          ...(savedChed ? { ched: savedChed } : {})
+        }
+      }
+      fetchMock.mockResolvedValue(Response.json(response))
+
+      await expect(
+        notificationsClient.update(request, id, body)
+      ).resolves.toEqual(response)
+    }
+  )
+
+  test.each([
+    ['EU', { reference: 'CHEDP.GB.2026.1234567' }],
+    ['REST_OF_WORLD', undefined],
+    [undefined, undefined]
+  ])('rejects an EU save with region %s and CHED %j', async (region, ched) => {
+    const body = {
+      organisationId: 'represented-importer',
+      notification: { countryOfExport: 'FR' }
+    }
+    fetchMock.mockResolvedValue(
+      Response.json({
+        ...notification,
+        notification: {
+          ...notification.notification,
+          countryOfExport: 'FR',
+          exportRegion: region,
+          ched
+        }
+      })
+    )
+
+    await expect(
+      notificationsClient.update(request, id, body)
+    ).rejects.toThrow()
+  })
+
+  test('rejects a rest-of-world save with a different CHED reference', async () => {
+    const body = {
+      organisationId: 'represented-importer',
+      notification: {
+        countryOfExport: 'AO',
+        ched: { reference: 'CHEDP.GB.2026.1234567' }
+      }
+    }
+    fetchMock.mockResolvedValue(
+      Response.json({
+        ...notification,
+        notification: {
+          ...notification.notification,
+          countryOfExport: 'AO',
+          exportRegion: 'REST_OF_WORLD',
+          ched: { reference: 'CHEDP.GB.2026.7654321' }
+        }
+      })
+    )
+
+    await expect(
+      notificationsClient.update(request, id, body)
+    ).rejects.toThrow()
+  })
+
   test('retains additional arrival response fields', async () => {
     const response = {
       ...notification,

@@ -68,12 +68,29 @@ captured at submission. Both limits are inclusive; validation retains submission
 seconds and milliseconds when checking these bounds.
 
 Entered consignment values are redisplayed on validation errors. A successful
-consignment POST saves arrival details onto the existing draft notification
-through the notification API using PATCH, then redirects with 303 to
-`/notification/next-step`, an unregistered URL that returns the normal 404 page.
-It does not create a new draft notification. Revisiting consignment details
-pre-fills the saved port of entry and expected arrival date and time.
-Additional details, country of export and CHED fields are not implemented.
+consignment POST saves the arrival, country of export and any required CHED
+reference onto the existing draft notification through the notification API
+using PATCH, then redirects with 303 to `/notification/commodity-details`. That
+route is not yet registered and returns 404 until the commodity details page is
+integrated. It does not create a new draft notification. Revisiting consignment
+details pre-fills the saved arrival, country of export and CHED reference.
+
+The additional details section asks for the country of export. Countries are
+temporary seeded data in
+[countries.json](src/server/routes/notification/consignment-details/countries.json)
+until MDM provides them. The two territories without two-letter codes are
+temporarily unavailable. The prototype treats all countries outside the EU-27
+as rest of the world; the SPS exemption is deferred until MDM. A CHED reference
+is required for rest-of-the-world countries. It is trimmed,
+uppercased and checked against the fixed `CHEDP.GB.YYYY.NNNNNNN` format in
+[ched-reference.js](src/server/routes/notification/consignment-details/ched-reference.js),
+which also holds the provisional error text. CHED references are ignored for
+EU-27 countries. The CHED field is always rendered and
+[a client script](src/client/javascripts/ched-reference.js) hides it unless a
+rest-of-the-world country is selected. If an EU country is selected, the
+script clears the reference and its errors. Without JavaScript the field stays
+visible and the server decides whether it is needed. The CHED reference is not
+checked against any other service.
 
 ## Server-side Caching
 

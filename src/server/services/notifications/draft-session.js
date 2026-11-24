@@ -111,13 +111,13 @@ export async function saveDraft(request, mode, draft) {
   return notification
 }
 
-export async function saveArrival(request, arrival, notification) {
+export async function saveConsignmentDetails(request, details, notification) {
   if (!notification) {
-    throw new Error('No saved notification for arrival details')
+    throw new Error('No saved notification for consignment details')
   }
   const updated = await notificationsClient.update(request, notification.id, {
     organisationId: organisationOf(request),
-    notification: { arrival }
+    notification: details
   })
   if (updated.reference !== notification.reference) {
     throw new Error('Draft reference has unexpectedly changed during save')

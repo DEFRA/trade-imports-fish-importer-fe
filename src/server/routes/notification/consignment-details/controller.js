@@ -1,5 +1,6 @@
 import { statusCodes } from '#/server/common/constants/status-codes.js'
-import { saveArrival } from '#/server/services/notifications/draft-session.js'
+import { saveConsignmentDetails } from '#/server/services/notifications/draft-session.js'
+import { countries, isRestOfWorld } from './countries.js'
 import { ports } from './ports.js'
 import { ukDate } from './uk-date.js'
 import { validateConsignmentDetails } from './validation.js'
@@ -20,10 +21,22 @@ function arrivalDateExample(now = new Date()) {
   return `${Math.max(minExampleDay, example.getUTCDate())} ${month} ${year}`
 }
 
+function countryItems(selectedValue) {
+  return [
+    { value: '', text: 'Select a country' },
+    ...countries.map((country) => ({
+      value: country.value,
+      text: country.text,
+      attributes: { 'data-rest-of-world': String(isRestOfWorld(country)) }
+    }))
+  ].map((item) => ({ ...item, selected: item.value === selectedValue }))
+}
+
 function pageModel({ values = {}, errors = {}, journeyId } = {}) {
   const errorList = Object.values(errors)
     .filter(Boolean)
     .map(({ text, fields }) => ({ text, href: `#${fields[0]}` }))
+  const countryValue = values['country-of-export']?.trim() ?? ''
 
   return {
     pageTitle: `${errorList.length ? 'Error: ' : ''}Consignment details`,
@@ -41,18 +54,25 @@ function pageModel({ values = {}, errors = {}, journeyId } = {}) {
         ...port,
         selected: port.value === (values.port?.trim() ?? '')
       })
-    )
+    ),
+    countries: countryItems(countryValue)
   }
 }
 
-function arrivalValues(notification) {
-  const arrival = notification?.notification?.arrival
+function consignmentValues(notification) {
+  const content = notification?.notification
+  const values = {
+    'country-of-export': content?.countryOfExport ?? '',
+    'ched-reference': content?.ched?.reference ?? ''
+  }
+  const arrival = content?.arrival
   if (!arrival) {
-    return {}
+    return values
   }
   const [year, month, day] = arrival.expectedArrivalDate.split('-')
   const [hour, minute] = arrival.expectedArrivalTime.split(':')
   return {
+    ...values,
     port: arrival.portOfEntry,
     'arrival-day': String(Number(day)),
     'arrival-month': String(Number(month)),
@@ -67,7 +87,7 @@ export const consignmentDetailsController = {
     return h.view(
       'notification/consignment-details/index',
       pageModel({
-        values: arrivalValues(request.app.notification),
+        values: consignmentValues(request.app.notification),
         journeyId: request.app.notification.id
       })
     )
@@ -87,7 +107,13 @@ export const submitConsignmentDetailsController = {
         .view('notification/consignment-details/index', model)
         .code(statusCodes.badRequest)
     }
-    await saveArrival(request, result.arrival, notification)
-    return h.redirect('/notification/next-step').code(statusCodes.seeOther)
+    await saveConsignmentDetails(
+      request,
+      { arrival: result.arrival, ...result.exportDetails },
+      notification
+    )
+    return h
+      .redirect('/notification/commodity-details')
+      .code(statusCodes.seeOther)
   }
 }
