@@ -1,8 +1,8 @@
 # Notification journey
 
-The [router plugin](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/plugins/router.js) registers the guidance, transport details, consignment details and next-step pages. Their code lives under [`src/server/routes/notification`](https://github.com/DEFRA/trade-imports-fish-importer-fe/tree/main/src/server/routes/notification).
+The [router plugin](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/plugins/router.js) registers the guidance, transport details, consignment details, commodity details and next-step pages. Their code lives under [`src/server/routes/notification`](https://github.com/DEFRA/trade-imports-fish-importer-fe/tree/main/src/server/routes/notification).
 
-The forward journey is guidance -> transport details -> consignment details, followed by a redirect to `/notification/commodity-details`. That route is not yet registered and returns 404 until the commodity details page is integrated. The temporary `/notification/next-step` placeholder remains available directly with a Back link to consignment details, but is no longer the onward destination. Back links on the implemented journey pages follow the reverse order, with guidance returning to the home page.
+The forward journey is guidance -> transport details -> consignment details -> commodity details. Back links on the implemented journey pages follow the reverse order, with guidance returning to the home page. The temporary `/notification/next-step` placeholder remains available directly with a Back link to consignment details.
 
 ## Guidance page
 
@@ -156,6 +156,27 @@ Successful responses include the following required envelope. The optional `arri
 - Optional `countryOfExport`, `exportRegion` and `ched` are validated when present. The CHED reference can be absent or an older string format on read, so users can correct it; malformed response structures are rejected.
 - The returned `id` must match the request. For writes, the organisation and every submitted notification field must match the response in the same canonical form as the request. For export details the client also checks the expected derived region and, for an EU save, that `ched` is absent.
 - Validation preserves additional response sections and metadata, including within `notification` and `transport`. It checks the required frontend subset, not the complete backend schema, and does not reject or strip sections simply because the frontend cannot edit them.
+
+## Commodity details page
+
+| Method | Path                              | Behavior                                                                                                |
+| ------ | --------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| GET    | `/notification/commodity-details` | Loads reference commodity data and renders the commodity selection interface with saved commodity rows. |
+| POST   | `/notification/commodity-details` | Validates and saves committed commodities; returns JSON with status 200 on success or an error message. |
+
+The commodity details page requires loaded reference data from [`getCommodities()`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/reference-data/commodities.js). The page renders with the reference data, pre-filled from any previously saved commodities in the session draft. The client-side script [`commodity-details.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/client/javascripts/commodity-details.js) handles the interactive dropdown selections and form submission.
+
+POST validates the submitted commodity list JSON payload:
+
+- Each commodity must have a `commodityCode`, optional `description`, and a non-empty `species` array.
+- Each species entry requires a `speciesCode`, `commonName`, optional `scientificName`, and `netWeightKg`.
+- Species codes must not duplicate within a commodity.
+- Commodity codes must not duplicate across the submission.
+- The sum of individual species weights must equal the commodity's `totalNetWeightKg`.
+
+On validation failure, the handler returns HTTP 400 with a JSON error message: `{"message":"Invalid commodity details"}` or a specific conflict message. On success, it returns HTTP 200 with `{"success":true}`, having saved the commodities to the draft.
+
+If reference data is unavailable, GET returns HTTP 503 with an error page. If the session has no active draft, the page redirects (303) to transport details.
 
 ## Validation boundaries and release dependency
 

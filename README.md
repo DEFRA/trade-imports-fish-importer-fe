@@ -67,8 +67,8 @@ in the past.
 Entered consignment values are redisplayed on validation errors. A successful
 consignment POST saves the arrival, country of export and any required CHED
 reference to the existing draft and redirects to `/notification/commodity-details`.
-That route is not yet registered and returns 404 until the commodity details page
-is integrated. Returning to consignment details loads the saved details from the
+The commodity details page loads reference data and allows entry of commodity
+codes, species and weights. Returning to consignment details loads the saved details from the
 backend.
 
 The additional details section asks for the country of export. Countries are

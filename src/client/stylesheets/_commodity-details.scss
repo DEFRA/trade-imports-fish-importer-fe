@@ -1,0 +1,120 @@
+@use "govuk-frontend";
+
+@include govuk-frontend.govuk-media-query($from: tablet) {
+  .app-commodity-species-column {
+    width: calc(27.5% - #{govuk-frontend.$govuk-gutter * 0.1});
+  }
+
+  .app-commodity-weight-column {
+    width: calc(22.5% + #{govuk-frontend.$govuk-gutter * 0.1});
+  }
+}
+
+.app-commodity-option {
+  cursor: pointer;
+  overflow: hidden;
+  padding: 8px 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  strong,
+  span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &[aria-selected="true"],
+  &:hover {
+    background: #e8f1f8;
+  }
+}
+
+.app-commodity-dropdown {
+  position: relative;
+}
+
+.app-commodity-dropdown__input {
+  position: relative;
+
+  .govuk-input {
+    display: block;
+    padding-right: 40px;
+  }
+}
+
+.app-commodity-dropdown__toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  bottom: 0;
+  cursor: pointer;
+  display: flex;
+  height: 40px;
+  justify-content: center;
+  padding: 0;
+  position: absolute;
+  right: 0;
+  width: 36px;
+}
+
+.app-commodity-dropdown__toggle::after,
+.app-commodity-species::after {
+  border-bottom: 2px solid currentcolor;
+  border-right: 2px solid currentcolor;
+  content: "";
+  flex: none;
+  height: 7px;
+  transform: rotate(45deg);
+  width: 7px;
+}
+
+.app-commodity-dropdown__toggle::after {
+  margin-bottom: 4px;
+}
+
+.app-commodity-dropdown__list {
+  background: #ffffff;
+  border: 1px solid #0b0c0c;
+  box-sizing: border-box;
+  font-family: govuk-frontend.$govuk-font-family;
+  max-height: 20rem;
+  overflow-y: auto;
+  position: absolute;
+  width: 100%;
+  z-index: 1;
+}
+
+.app-commodity-dropdown__list--species {
+  max-width: min(80vw, 16rem);
+  min-width: 100%;
+  width: max-content;
+}
+
+.app-commodity-species {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-width: 0;
+  text-align: left;
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &::after {
+    margin: 0 5px 4px 8px;
+  }
+}
+
+.app-remove-commodity {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: #d4351c;
+  font: inherit;
+  padding: 0;
+  text-decoration: none;
+}

@@ -33,7 +33,21 @@ export const postTransportDetailsController = {
         })
         .code(statusCodes.badRequest)
     }
-    await saveDraft(request, request.payload.transportMethod)
+    try {
+      await saveDraft(request, request.payload.transportMethod)
+    } catch (error) {
+      request.logger.error({ err: error }, 'Failed to save transport details')
+      return h
+        .view(
+          'notification/transport-details/index',
+          transportDetailsModel(
+            request.payload.transportMethod,
+            false,
+            'We could not confirm that your transport details were saved. Try again.'
+          )
+        )
+        .code(statusCodes.internalServerError)
+    }
     return h
       .redirect('/notification/consignment-details')
       .code(statusCodes.seeOther)

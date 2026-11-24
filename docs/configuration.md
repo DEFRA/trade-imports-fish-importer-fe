@@ -18,7 +18,7 @@
 | `NOTIFICATION_API_URL`   | Derived from `ENVIRONMENT`              | Base URL of the fish notification backend; see [Notification journey](notification-journey.md).                                       |
 | `GOOGLE_TAG_MANAGER_KEY` | Empty string                            | Tag Manager container ID; see [Cookie consent](cookie-consent.md).                                                                    |
 
-The service name is fixed in configuration as `trade-imports-fish-importer-fe`. `NOTIFICATION_API_URL` defaults to `http://localhost:8085` when `ENVIRONMENT` is `local`, and to `https://trade-imports-fish-be.{ENVIRONMENT}.cdp-int.defra.cloud` in CDP environments; set it explicitly to override. An `ENVIRONMENT` value outside the listed set fails config validation at startup.
+The service name is fixed in configuration as `trade-imports-fish-importer-fe`. The service navigation display name, `insServiceName`, defaults to `Import notification service`. `NOTIFICATION_API_URL` defaults to `http://localhost:8085` when `ENVIRONMENT` is `local`, and to `https://trade-imports-fish-be.{ENVIRONMENT}.cdp-int.defra.cloud` in CDP environments; set it explicitly to override. An `ENVIRONMENT` value outside the listed set fails config validation at startup.
 
 Config exposes `HTTP_PROXY`; the application code does not itself configure an outbound HTTP client with this value.
 

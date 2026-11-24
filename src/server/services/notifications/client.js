@@ -2,7 +2,24 @@ import Joi from 'joi'
 
 import { config } from '#/config/config.js'
 import { statusCodes } from '#/server/common/constants/status-codes.js'
-import { transportModes } from '#/server/common/constants/transport-methods.js'
+import {
+  transportModes,
+  toTransportMethod
+} from '#/server/common/constants/transport-methods.js'
+
+const speciesSchema = Joi.object({
+  speciesCode: Joi.string().required(),
+  commonName: Joi.string().required(),
+  netWeightKg: Joi.number().required(),
+  scientificName: Joi.string().allow(null).optional()
+}).unknown(true)
+
+const commoditySchema = Joi.object({
+  commodityCode: Joi.string().required(),
+  description: Joi.string().allow(null).optional(),
+  species: Joi.array().items(speciesSchema).min(1).required(),
+  totalNetWeightKg: Joi.number().required()
+}).unknown(true)
 
 const notificationSchema = Joi.object({
   id: Joi.string().uuid().required(),
@@ -18,7 +35,7 @@ const notificationSchema = Joi.object({
         .required()
     })
       .unknown(true)
-      .required(),
+      .optional(),
     arrival: Joi.object({
       portOfEntry: Joi.string()
         .pattern(/^[A-Z0-9-]+$/)
@@ -37,7 +54,8 @@ const notificationSchema = Joi.object({
     exportRegion: Joi.string().valid('EU', 'REST_OF_WORLD').strict(),
     ched: Joi.object({
       reference: Joi.string().allow('').strict()
-    }).unknown(true)
+    }).unknown(true),
+    commodities: Joi.array().items(commoditySchema).allow(null).optional()
   })
     .unknown(true)
     .required(),
@@ -69,6 +87,65 @@ function expectedStatuses(method) {
     : [statusCodes.ok]
 }
 
+function normalize(value) {
+  return value.trim().toLowerCase()
+}
+
+function uniqueIdentities(values, key) {
+  const identities = values.map((value) => normalize(value[key]))
+  const set = new Set(identities)
+  if (set.size !== identities.length) {
+    throw new Error('Returned commodities or species are duplicated')
+  }
+  return set
+}
+
+function verifyCommodities(submitted, returned) {
+  if (!Array.isArray(returned) || submitted.length !== returned.length) {
+    throw new Error('Returned commodities do not match submitted list')
+  }
+  uniqueIdentities(submitted, 'commodityCode')
+  uniqueIdentities(returned, 'commodityCode')
+
+  for (const submittedCommodity of submitted) {
+    const commodity = returned.find(
+      (item) =>
+        normalize(item.commodityCode) ===
+        normalize(submittedCommodity.commodityCode)
+    )
+    if (
+      !commodity ||
+      commodity.totalNetWeightKg !== submittedCommodity.totalNetWeightKg ||
+      (submittedCommodity.description !== undefined &&
+        commodity.description !== submittedCommodity.description) ||
+      !Array.isArray(commodity.species) ||
+      commodity.species.length !== submittedCommodity.species.length
+    ) {
+      throw new Error('Returned commodities do not match submitted list')
+    }
+
+    const returnedCodes = uniqueIdentities(commodity.species, 'speciesCode')
+    uniqueIdentities(submittedCommodity.species, 'speciesCode')
+    for (const submittedSpecies of submittedCommodity.species) {
+      const species = commodity.species.find(
+        (item) =>
+          normalize(item.speciesCode) ===
+          normalize(submittedSpecies.speciesCode)
+      )
+      if (
+        !species ||
+        !returnedCodes.has(normalize(submittedSpecies.speciesCode)) ||
+        species.commonName !== submittedSpecies.commonName ||
+        species.netWeightKg !== submittedSpecies.netWeightKg ||
+        (submittedSpecies.scientificName !== undefined &&
+          species.scientificName !== submittedSpecies.scientificName)
+      ) {
+        throw new Error('Returned species do not match submitted list')
+      }
+    }
+  }
+}
+
 function verifyNotification(notification, id, payload) {
   if (notification.id !== id) {
     throw new Error('Notification API returned a different draft identity')
@@ -76,8 +153,13 @@ function verifyNotification(notification, id, payload) {
   if (payload) {
     const sentDetails = payload.notification
     const returnedDetails = notification.notification
-    const detailsDiffer = Object.entries(payload.notification).some(
-      ([section, fields]) => {
+    const detailsDiffer =
+      sentDetails &&
+      Object.entries(sentDetails).some(([section, fields]) => {
+        // Skip commodities verification here - it's handled separately below
+        if (section === 'commodities') {
+          return false
+        }
         const returned = notification.notification[section]
         if (typeof fields !== 'object' || fields === null) {
           return returned !== fields
@@ -85,10 +167,9 @@ function verifyNotification(notification, id, payload) {
         return Object.entries(fields).some(
           ([field, value]) => returned?.[field] !== value
         )
-      }
-    )
+      })
     const exportDetailsDiffer =
-      sentDetails.countryOfExport !== undefined &&
+      sentDetails?.countryOfExport !== undefined &&
       (returnedDetails.exportRegion !==
         (sentDetails.ched ? 'REST_OF_WORLD' : 'EU') ||
         (!sentDetails.ched && returnedDetails.ched !== undefined))
@@ -101,6 +182,10 @@ function verifyNotification(notification, id, payload) {
         'Notification API response does not match the saved details'
       )
     }
+  }
+  const commodities = payload?.commodities ?? payload?.notification?.commodities
+  if (commodities) {
+    verifyCommodities(commodities, notification.commodities)
   }
 }
 
@@ -123,14 +208,30 @@ async function send(request, id, method, payload) {
   }
   if (!expectedStatuses(method).includes(response.status)) {
     await response.body?.cancel()
+    if (response.status === 409 && method !== 'GET') {
+      const error = new Error(
+        method === 'POST'
+          ? 'The notification could not be created because the idempotency key conflicts with an existing request.'
+          : 'The notification could not be updated because its status or organisation conflicts with this request.'
+      )
+      error.statusCode = 409
+      throw error
+    }
     throw new Error(
       `Notification API ${method} failed with status ${response.status}`
     )
   }
 
-  const notification = await notificationSchema.validateAsync(
+  const responseBody = await notificationSchema.validateAsync(
     await response.json()
   )
+  const notification = {
+    ...responseBody,
+    transportMethod: responseBody.notification.transport?.mode
+      ? toTransportMethod(responseBody.notification.transport.mode)
+      : undefined,
+    commodities: responseBody.notification.commodities
+  }
   verifyNotification(notification, id, payload)
   return notification
 }

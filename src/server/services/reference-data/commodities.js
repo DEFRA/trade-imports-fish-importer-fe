@@ -1,0 +1,88 @@
+import { config } from '#/config/config.js'
+
+let cached
+
+const identity = (value) => value.trim().toLowerCase()
+
+function validateCommodities(data) {
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('Invalid commodity reference data')
+  }
+  const codes = new Set()
+  for (const commodity of data) {
+    if (
+      typeof commodity?.code !== 'string' ||
+      !commodity.code.trim() ||
+      typeof commodity.name !== 'string' ||
+      !commodity.name.trim() ||
+      !Array.isArray(commodity.species)
+    ) {
+      throw new Error('Invalid commodity reference data')
+    }
+    const code = identity(commodity.code)
+    if (codes.has(code)) {
+      throw new Error('Duplicate commodity code in reference data')
+    }
+    codes.add(code)
+    const names = new Map()
+    const speciesCodes = new Set()
+    for (const species of commodity.species) {
+      if (
+        typeof species?.faoCode !== 'string' ||
+        !species.faoCode.trim() ||
+        typeof species.commonName !== 'string' ||
+        !species.commonName.trim() ||
+        (species.scientificName != null &&
+          typeof species.scientificName !== 'string')
+      ) {
+        throw new Error('Invalid species reference data')
+      }
+      const speciesCode = identity(species.faoCode)
+      const name = identity(species.commonName).replace(/\s+/g, ' ')
+      if (speciesCodes.has(speciesCode) || names.has(name)) {
+        throw new Error('Ambiguous species reference data')
+      }
+      speciesCodes.add(speciesCode)
+      names.set(name, speciesCode)
+    }
+  }
+  return data
+}
+
+async function loadCommodities(logger) {
+  try {
+    const base = config.get('referenceDataApiUrl')
+    const path = config.get('commoditiesPath')
+    if (!base || !path) {
+      throw new Error('Reference data API URL or commodities path is not set')
+    }
+    const url = new URL(path, base)
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(10000)
+    })
+    if (!response.ok) {
+      throw new Error(`Reference data API returned ${response.status}`)
+    }
+    return validateCommodities(await response.json())
+  } catch (error) {
+    if (!config.get('isDevelopment')) {
+      throw error
+    }
+    logger.warn({ err: error }, 'Using development commodity reference data')
+    const { default: fixture } = await import('./commodities.json', {
+      with: { type: 'json' }
+    })
+    return validateCommodities(fixture)
+  }
+}
+
+export async function getCommodities(logger) {
+  if (!cached) {
+    cached = loadCommodities(logger).catch((error) => {
+      cached = undefined
+      throw error
+    })
+  }
+  return cached
+}

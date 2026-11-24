@@ -21,7 +21,13 @@ const notification = {
   id,
   reference: 'GBN-FIS-26-AXN04',
   status: 'DRAFT',
-  ...payload,
+  organisationId: payload.organisationId,
+  notification: {
+    transport: {
+      mode: 'AIR_FREIGHT'
+    },
+    commodities: null
+  },
   createdAt: '2026-11-16T16:00:00.123Z',
   updatedAt: '2026-11-16T16:00:00.123Z'
 }
@@ -42,7 +48,10 @@ describe('notificationsClient', () => {
     fetchMock.mockResolvedValue(Response.json(notification, { status: 201 }))
     await expect(
       notificationsClient.create(request, id, payload)
-    ).resolves.toEqual(notification)
+    ).resolves.toMatchObject({
+      ...notification,
+      transportMethod: 'air-freight'
+    })
     const [url, options] = fetchMock.mock.calls[0]
     expect(url.toString()).toBe(
       new URL('/notifications', config.get('notificationApiUrl')).toString()
@@ -74,16 +83,114 @@ describe('notificationsClient', () => {
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(payload)
   })
 
+  test('patches and verifies submitted commodities without relying on array order', async () => {
+    const commodities = [
+      {
+        commodityCode: '03021400',
+        description: 'Fresh salmon',
+        species: [
+          {
+            speciesCode: 'SAL',
+            commonName: 'Atlantic salmon',
+            netWeightKg: 12
+          }
+        ],
+        totalNetWeightKg: 12
+      }
+    ]
+    fetchMock.mockResolvedValue(
+      Response.json({
+        ...notification,
+        notification: {
+          ...notification.notification,
+          commodities: [
+            {
+              ...commodities[0],
+              extraBackendField: 'ignored',
+              species: [
+                {
+                  ...commodities[0].species[0],
+                  scientificName: null,
+                  extraBackendField: 'ignored'
+                }
+              ]
+            }
+          ]
+        }
+      })
+    )
+
+    await expect(
+      notificationsClient.update(request, id, {
+        organisationId: payload.organisationId,
+        notification: { commodities }
+      })
+    ).resolves.toMatchObject({ commodities })
+    expect(fetchMock.mock.calls[0][1].method).toBe('PATCH')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      organisationId: payload.organisationId,
+      notification: { commodities }
+    })
+  })
+
+  test('rejects a PATCH response whose saved commodity values differ', async () => {
+    const commodity = {
+      commodityCode: '03021400',
+      species: [
+        {
+          speciesCode: 'SAL',
+          commonName: 'Atlantic salmon',
+          netWeightKg: 12
+        }
+      ],
+      totalNetWeightKg: 12
+    }
+    fetchMock.mockResolvedValue(
+      Response.json({
+        ...notification,
+        notification: {
+          ...notification.notification,
+          commodities: [{ ...commodity, totalNetWeightKg: 13 }]
+        }
+      })
+    )
+
+    await expect(
+      notificationsClient.update(request, id, {
+        organisationId: payload.organisationId,
+        commodities: [commodity]
+      })
+    ).rejects.toThrow('Returned commodities do not match submitted list')
+  })
+
+  test('reports a backend conflict', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 409 }))
+
+    await expect(
+      notificationsClient.update(request, id, { commodities: [] })
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringContaining('conflicts with this request')
+    })
+  })
+
   test('an identical creation replay accepts 200', async () => {
     fetchMock.mockResolvedValue(Response.json(notification))
     await expect(
       notificationsClient.create(request, id, payload)
-    ).resolves.toEqual(notification)
+    ).resolves.toMatchObject({
+      ...notification,
+      transportMethod: 'air-freight'
+    })
   })
 
-  test.each(['VESSEL', 'AIR_FREIGHT', 'ROAD_VEHICLE'])(
+  test.each([
+    ['VESSEL', 'ship-or-vessel'],
+    ['AIR_FREIGHT', 'air-freight'],
+    ['ROAD_VEHICLE', 'road-vehicle']
+  ])(
     'reads canonical mode %s without stripping additional response data',
-    async (mode) => {
+    async (mode, expectedMethod) => {
       const response = {
         ...notification,
         notification: {
@@ -93,9 +200,10 @@ describe('notificationsClient', () => {
         metadata: { version: 1 }
       }
       fetchMock.mockResolvedValue(Response.json(response))
-      await expect(notificationsClient.find(request, id)).resolves.toEqual(
-        response
-      )
+      await expect(notificationsClient.find(request, id)).resolves.toEqual({
+        ...response,
+        transportMethod: expectedMethod
+      })
     }
   )
 
@@ -107,7 +215,11 @@ describe('notificationsClient', () => {
     fetchMock.mockResolvedValue(Response.json(response))
     await expect(
       notificationsClient.update(request, id, payload)
-    ).resolves.toEqual(response)
+    ).resolves.toEqual({
+      ...response,
+      transportMethod: 'air-freight',
+      commodities: response.notification.commodities
+    })
     expect(fetchMock.mock.calls[0][1].method).toBe('PATCH')
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(payload)
   })
@@ -127,7 +239,11 @@ describe('notificationsClient', () => {
     fetchMock.mockResolvedValue(Response.json(response))
     await expect(
       notificationsClient.update(request, id, arrivalPayload)
-    ).resolves.toEqual(response)
+    ).resolves.toEqual({
+      ...response,
+      transportMethod: 'air-freight',
+      commodities: response.notification.commodities
+    })
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(arrivalPayload)
   })
 
@@ -215,9 +331,11 @@ describe('notificationsClient', () => {
         }
       }
       fetchMock.mockResolvedValue(Response.json(response))
-      await expect(notificationsClient.find(request, id)).resolves.toEqual(
-        response
-      )
+      await expect(notificationsClient.find(request, id)).resolves.toEqual({
+        ...response,
+        transportMethod: 'air-freight',
+        commodities: response.notification.commodities
+      })
     }
   )
 
@@ -252,7 +370,11 @@ describe('notificationsClient', () => {
 
       await expect(
         notificationsClient.update(request, id, body)
-      ).resolves.toEqual(response)
+      ).resolves.toEqual({
+        ...response,
+        transportMethod: 'air-freight',
+        commodities: response.notification.commodities
+      })
     }
   )
 
@@ -321,9 +443,11 @@ describe('notificationsClient', () => {
       }
     }
     fetchMock.mockResolvedValue(Response.json(response))
-    await expect(notificationsClient.find(request, id)).resolves.toEqual(
-      response
-    )
+    await expect(notificationsClient.find(request, id)).resolves.toEqual({
+      ...response,
+      transportMethod: 'air-freight',
+      commodities: response.notification.commodities
+    })
   })
 
   test.each([
@@ -389,14 +513,19 @@ describe('notificationsClient', () => {
     'does not treat HTTP %s as a successful save',
     async (status) => {
       fetchMock.mockResolvedValue(new Response(null, { status }))
+      const createExpected =
+        status === 409 ? 'idempotency key conflicts' : `status ${status}`
+      const updateExpected =
+        status === 409 ? 'status or organisation conflicts' : `status ${status}`
+      const findExpected = `status ${status}`
       await expect(
         notificationsClient.create(request, id, payload)
-      ).rejects.toThrow(`status ${status}`)
+      ).rejects.toThrow(createExpected)
       await expect(
         notificationsClient.update(request, id, payload)
-      ).rejects.toThrow(`status ${status}`)
+      ).rejects.toThrow(updateExpected)
       await expect(notificationsClient.find(request, id)).rejects.toThrow(
-        `status ${status}`
+        findExpected
       )
     }
   )
