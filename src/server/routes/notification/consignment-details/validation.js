@@ -231,5 +231,13 @@ export function validateConsignmentDetails(payload, now = new Date()) {
     Object.assign(errors, validateArrival(values, date.date, now))
   }
 
-  return { values, errors }
+  const arrival = Object.values(errors).some(Boolean)
+    ? undefined
+    : {
+        portOfEntry: port,
+        expectedArrivalDate: date.date.toISOString().slice(0, 10),
+        expectedArrivalTime: `${values['arrival-hour'].trim().padStart(2, '0')}:${values['arrival-minute'].trim().padStart(2, '0')}`
+      }
+
+  return { values, errors, arrival }
 }

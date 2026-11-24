@@ -46,6 +46,7 @@ function cookieHeader(jar) {
 
 describe('transport details routes', () => {
   let server
+  let drafts
 
   beforeAll(async () => {
     server = await createServer()
@@ -58,14 +59,30 @@ describe('transport details routes', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
-    notificationsClient.find.mockResolvedValue(null)
+    drafts = new Map()
+    notificationsClient.find.mockImplementation(
+      async (_request, id) => drafts.get(id) ?? null
+    )
     notificationsClient.create.mockImplementation(
-      async (_request, id, payload) =>
-        notification(id, payload.notification.transport.mode)
+      async (_request, id, payload) => {
+        const saved = notification(id, payload.notification.transport.mode)
+        drafts.set(id, saved)
+        return saved
+      }
     )
     notificationsClient.update.mockImplementation(
-      async (_request, id, payload) =>
-        notification(id, payload.notification.transport.mode)
+      async (_request, id, payload) => {
+        const existing = drafts.get(id) ?? notification(id)
+        const saved = {
+          ...existing,
+          notification: {
+            ...existing.notification,
+            ...payload.notification
+          }
+        }
+        drafts.set(id, saved)
+        return saved
+      }
     )
   })
 

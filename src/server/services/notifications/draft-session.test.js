@@ -1,4 +1,10 @@
-import { currentDraft, loadDraft, saveDraft } from './draft-session.js'
+import {
+  currentDraft,
+  loadDraft,
+  loadSavedDraft,
+  saveArrival,
+  saveDraft
+} from './draft-session.js'
 import { notificationsClient } from './client.js'
 
 vi.mock('./client.js', () => ({
@@ -49,6 +55,63 @@ describe('notification draft session', () => {
     expect(currentDraft(request).id).toMatch(/^[a-f0-9-]{36}$/)
     expect(notificationsClient.find).not.toHaveBeenCalled()
     expect(notificationsClient.create).not.toHaveBeenCalled()
+  })
+
+  test('checking for a saved draft does not start a journey', async () => {
+    expect(await loadSavedDraft(request)).toBeNull()
+    expect(currentDraft(request)).toBeNull()
+    expect(notificationsClient.find).not.toHaveBeenCalled()
+    expect(notificationsClient.create).not.toHaveBeenCalled()
+  })
+
+  test('an unsaved journey is not mistaken for a backend draft', async () => {
+    await loadDraft(request)
+    const id = currentDraft(request).id
+
+    expect(await loadSavedDraft(request)).toBeNull()
+    expect(await saveArrival(request, {})).toBeNull()
+    expect(currentDraft(request)).toMatchObject({ id, saved: false })
+    expect(notificationsClient.update).not.toHaveBeenCalled()
+    expect(notificationsClient.create).not.toHaveBeenCalled()
+  })
+
+  test('saves arrival details with PATCH after verifying the existing draft', async () => {
+    await loadDraft(request)
+    const id = currentDraft(request).id
+    const arrival = {
+      portOfEntry: 'FELIXSTOWE',
+      expectedArrivalDate: '2027-06-15',
+      expectedArrivalTime: '09:05'
+    }
+    const response = {
+      ...saved(id),
+      notification: {
+        transport: { mode: 'AIR_FREIGHT' },
+        arrival: {
+          ...arrival,
+          expectedArrivalAt: '2027-06-15T08:05:00Z',
+          borderControlPost: 'FELIXSTOWE'
+        }
+      }
+    }
+    notificationsClient.find.mockResolvedValue(saved(id))
+    notificationsClient.update.mockResolvedValue(response)
+
+    await expect(saveArrival(request, arrival)).resolves.toEqual(response)
+
+    expect(notificationsClient.find).toHaveBeenLastCalledWith(request, id)
+    expect(notificationsClient.update).toHaveBeenCalledExactlyOnceWith(
+      request,
+      id,
+      { organisationId, notification: { arrival } }
+    )
+    expect(notificationsClient.create).not.toHaveBeenCalled()
+    expect(currentDraft(request)).toEqual({
+      id,
+      reference: 'GBN-FIS-26-AXN04',
+      organisationId,
+      saved: true
+    })
   })
 
   test('first save creates once and later saves update the same ID/reference', async () => {

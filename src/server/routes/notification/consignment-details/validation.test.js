@@ -2,7 +2,7 @@ import { validateConsignmentDetails } from './validation.js'
 
 const now = new Date('2026-11-19T14:30:45Z')
 const validPayload = {
-  port: 'dover',
+  port: 'DOVER',
   'arrival-day': '20',
   'arrival-month': '11',
   'arrival-year': '2026',
@@ -127,6 +127,27 @@ describe('Consignment details validation', () => {
       expect(Object.values(errors).filter(Boolean)).toEqual([])
     }
   )
+
+  test('returns a valid arrival in the canonical API format', () => {
+    const result = validateConsignmentDetails(
+      {
+        ...validPayload,
+        port: 'FELIXSTOWE',
+        'arrival-day': '5',
+        'arrival-month': 'sept',
+        'arrival-year': '2026',
+        'arrival-hour': '9',
+        'arrival-minute': '5'
+      },
+      new Date('2026-01-01T00:00:00Z')
+    )
+
+    expect(result.arrival).toEqual({
+      portOfEntry: 'FELIXSTOWE',
+      expectedArrivalDate: '2026-09-05',
+      expectedArrivalTime: '09:05'
+    })
+  })
 
   test('reports one combined minimum-window error for past arrivals', () => {
     const { errors } = validate({
@@ -541,7 +562,7 @@ describe('Consignment details validation', () => {
   test('preserves original strings while validating trimmed values', () => {
     const payload = {
       ...validPayload,
-      port: ' dover ',
+      port: ' DOVER ',
       'arrival-month': ' November ',
       'arrival-hour': ' 9 ',
       'arrival-minute': ' 5 '

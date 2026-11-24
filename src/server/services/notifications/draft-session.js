@@ -64,6 +64,18 @@ export async function loadDraft(request) {
   return notification
 }
 
+export async function loadSavedDraft(request) {
+  const draft = currentDraft(request)
+  if (!draft) {
+    return null
+  }
+  const notification = await findDraft(request, draft)
+  if (notification) {
+    remember(request, notification)
+  }
+  return notification
+}
+
 export async function saveDraft(request, transportMethod) {
   const draft = currentDraft(request)
   if (!draft) {
@@ -82,6 +94,27 @@ export async function saveDraft(request, transportMethod) {
     ? await notificationsClient.update(request, draft.id, payload)
     : await notificationsClient.create(request, draft.id, payload)
   if (existing && notification.reference !== existing.reference) {
+    throw new Error('Draft reference has unexpectedly changed during save')
+  }
+  remember(request, notification)
+  return notification
+}
+
+export async function saveArrival(request, arrival) {
+  const draft = currentDraft(request)
+  if (!draft) {
+    throw new Error('No active notification journey')
+  }
+  const existing = await findDraft(request, draft)
+  if (!existing) {
+    return null
+  }
+  remember(request, existing)
+  const notification = await notificationsClient.update(request, draft.id, {
+    organisationId: organisationOf(request),
+    notification: { arrival }
+  })
+  if (notification.reference !== existing.reference) {
     throw new Error('Draft reference has unexpectedly changed during save')
   }
   remember(request, notification)

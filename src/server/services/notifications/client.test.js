@@ -7,6 +7,16 @@ const payload = {
   organisationId: 'represented-importer',
   notification: { transport: { mode: 'AIR_FREIGHT' } }
 }
+const arrivalPayload = {
+  organisationId: 'represented-importer',
+  notification: {
+    arrival: {
+      portOfEntry: 'FELIXSTOWE',
+      expectedArrivalDate: '2027-06-15',
+      expectedArrivalTime: '09:05'
+    }
+  }
+}
 const notification = {
   id,
   reference: 'GBN-FIS-26-AXN04',
@@ -101,6 +111,90 @@ describe('notificationsClient', () => {
     expect(fetchMock.mock.calls[0][1].method).toBe('PATCH')
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(payload)
   })
+
+  test('accepts and verifies an arrival-only PATCH response', async () => {
+    const response = {
+      ...notification,
+      notification: {
+        ...notification.notification,
+        arrival: {
+          ...arrivalPayload.notification.arrival,
+          expectedArrivalAt: '2027-06-15T08:05:00Z',
+          borderControlPost: 'FELIXSTOWE'
+        }
+      }
+    }
+    fetchMock.mockResolvedValue(Response.json(response))
+    await expect(
+      notificationsClient.update(request, id, arrivalPayload)
+    ).resolves.toEqual(response)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(arrivalPayload)
+  })
+
+  test('retains additional arrival response fields', async () => {
+    const response = {
+      ...notification,
+      notification: {
+        ...notification.notification,
+        arrival: {
+          ...arrivalPayload.notification.arrival,
+          expectedArrivalAt: '2027-06-15T08:05:00Z',
+          borderControlPost: 'FELIXSTOWE',
+          referenceData: { version: 2 }
+        }
+      }
+    }
+    fetchMock.mockResolvedValue(Response.json(response))
+    await expect(notificationsClient.find(request, id)).resolves.toEqual(
+      response
+    )
+  })
+
+  test.each([
+    ['portOfEntry', 'felixstowe'],
+    ['expectedArrivalDate', '15/06/2027'],
+    ['expectedArrivalTime', '9:05'],
+    ['expectedArrivalAt', 'not-a-date']
+  ])('rejects a response with malformed arrival %s', async (field, value) => {
+    const response = {
+      ...notification,
+      notification: {
+        ...notification.notification,
+        arrival: {
+          ...arrivalPayload.notification.arrival,
+          expectedArrivalAt: '2027-06-15T08:05:00Z',
+          [field]: value
+        }
+      }
+    }
+    fetchMock.mockResolvedValue(Response.json(response))
+    await expect(notificationsClient.find(request, id)).rejects.toThrow()
+  })
+
+  test.each([
+    ['portOfEntry', 'DOVER'],
+    ['expectedArrivalDate', '2027-06-16'],
+    ['expectedArrivalTime', '09:06']
+  ])(
+    'rejects an arrival PATCH response with a different %s',
+    async (field, value) => {
+      const response = {
+        ...notification,
+        notification: {
+          ...notification.notification,
+          arrival: {
+            ...arrivalPayload.notification.arrival,
+            expectedArrivalAt: '2027-06-15T08:05:00Z',
+            [field]: value
+          }
+        }
+      }
+      fetchMock.mockResolvedValue(Response.json(response))
+      await expect(
+        notificationsClient.update(request, id, arrivalPayload)
+      ).rejects.toThrow('does not match the saved details')
+    }
+  )
 
   test('only GET 404 represents an absent draft', async () => {
     fetchMock.mockImplementation(

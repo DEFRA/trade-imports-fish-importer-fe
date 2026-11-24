@@ -1,8 +1,18 @@
 import * as cheerio from 'cheerio'
 import { createServer } from '#/server/server.js'
 import { config } from '#/config/config.js'
+import { notificationsClient } from '#/server/services/notifications/client.js'
+
+vi.mock('#/server/services/notifications/client.js', () => ({
+  notificationsClient: {
+    find: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn()
+  }
+}))
 
 const url = '/notification/consignment-details'
+const transportUrl = '/notification/transport-details'
 const auth = {
   strategy: 'session',
   credentials: {
@@ -12,7 +22,7 @@ const auth = {
   }
 }
 const validPayload = {
-  port: 'dover',
+  port: 'DOVER',
   'arrival-day': '20',
   'arrival-month': '11',
   'arrival-year': '2026',
@@ -26,6 +36,42 @@ const maximumMessage =
 
 describe('Consignment details journey', () => {
   let server
+  let drafts
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    drafts = new Map()
+    notificationsClient.find.mockImplementation(
+      async (_request, id) => drafts.get(id) ?? null
+    )
+    notificationsClient.create.mockImplementation(
+      async (_request, id, payload) => {
+        const notification = {
+          id,
+          reference: 'GBN-FIS-26-AXN04',
+          status: 'DRAFT',
+          organisationId: auth.credentials.organisationId,
+          notification: payload.notification,
+          createdAt: '2026-11-19T14:30:45.000Z',
+          updatedAt: '2026-11-19T14:30:45.000Z'
+        }
+        drafts.set(id, notification)
+        return notification
+      }
+    )
+    notificationsClient.update.mockImplementation(
+      async (_request, id, payload) => {
+        const existing = drafts.get(id)
+        const notification = {
+          ...existing,
+          notification: { ...existing.notification, ...payload.notification },
+          updatedAt: '2026-11-19T14:30:45.000Z'
+        }
+        drafts.set(id, notification)
+        return notification
+      }
+    )
+  })
 
   beforeAll(async () => {
     server = await createServer()
@@ -53,28 +99,80 @@ describe('Consignment details journey', () => {
     ).toBe(false)
   }
 
-  async function submit(overrides = {}) {
-    const response = await server.inject({ method: 'GET', url, auth })
-    const $ = cheerio.load(response.payload)
-    const cookie = (response.headers['set-cookie'] ?? [])
-      .map((value) => value.split(';')[0])
-      .join('; ')
+  function receiveCookies(jar, response) {
+    for (const cookie of response.headers['set-cookie'] ?? []) {
+      const pair = cookie.split(';')[0]
+      const separator = pair.indexOf('=')
+      jar[pair.slice(0, separator)] = pair.slice(separator + 1)
+    }
+  }
 
-    return server.inject({
+  function cookieHeader(jar) {
+    return Object.entries(jar)
+      .map(([name, value]) => `${name}=${value}`)
+      .join('; ')
+  }
+
+  async function startDraft() {
+    const journey = await server.inject({
+      method: 'GET',
+      url: transportUrl,
+      auth
+    })
+    const jar = {}
+    receiveCookies(jar, journey)
+    const $ = cheerio.load(journey.payload)
+    const saved = await server.inject({
+      method: 'POST',
+      url: transportUrl,
+      auth,
+      headers: { cookie: cookieHeader(jar) },
+      payload: {
+        transportMethod: 'air-freight',
+        crumb: $('form input[name="crumb"]').val()
+      }
+    })
+    receiveCookies(jar, saved)
+    return jar
+  }
+
+  async function visitArrival(jar) {
+    const response = await server.inject({
+      method: 'GET',
+      url,
+      auth,
+      headers: { cookie: cookieHeader(jar) }
+    })
+    receiveCookies(jar, response)
+    return response
+  }
+
+  async function postArrival(jar, overrides = {}) {
+    const response = await visitArrival(jar)
+    const $ = cheerio.load(response.payload)
+
+    const submitted = await server.inject({
       method: 'POST',
       url,
       auth,
-      headers: { cookie },
+      headers: { cookie: cookieHeader(jar) },
       payload: {
         ...validPayload,
         ...overrides,
         crumb: $('form input[name="crumb"]').val()
       }
     })
+    receiveCookies(jar, submitted)
+    return submitted
+  }
+
+  async function submit(overrides = {}) {
+    return postArrival(await startDraft(), overrides)
   }
 
   test('renders only the arrival form with the agreed content and seeded ports', async () => {
-    const response = await server.inject({ method: 'GET', url, auth })
+    const jar = await startDraft()
+    const response = await visitArrival(jar)
     const $ = cheerio.load(response.payload)
     const form = $('main form')
     const fields = form.find('input:not([type="hidden"])')
@@ -111,7 +209,7 @@ describe('Consignment details journey', () => {
         .map((_, option) => $(option).text().trim())
         .get()
     ).toEqual([
-      'Select a destination port',
+      'Select a port of entry',
       'Dover',
       'Felixstowe',
       'Grimsby',
@@ -120,6 +218,22 @@ describe('Consignment details journey', () => {
       'Liverpool',
       'Portsmouth',
       'Tilbury'
+    ])
+    expect(
+      form
+        .find('select option')
+        .map((_, option) => $(option).attr('value'))
+        .get()
+    ).toEqual([
+      '',
+      'DOVER',
+      'FELIXSTOWE',
+      'GRIMSBY',
+      'HULL',
+      'IMMINGHAM',
+      'LIVERPOOL',
+      'PORTSMOUTH',
+      'TILBURY'
     ])
     expect(fields).toHaveLength(5)
     fields.each((_, field) => {
@@ -152,7 +266,221 @@ describe('Consignment details journey', () => {
     expect($('main').text()).not.toMatch(
       /Additional details|Country of export|CHED/
     )
+  })
+
+  test('redirects to transport details when there is no saved draft', async () => {
+    const response = await server.inject({ method: 'GET', url, auth })
+
+    expect(response.statusCode).toBe(303)
+    expect(response.headers.location).toBe('/notification/transport-details')
+    expect(notificationsClient.create).not.toHaveBeenCalled()
     expectNoSession(response)
+  })
+
+  test('redirects when the session draft has not been saved to the backend', async () => {
+    const journey = await server.inject({
+      method: 'GET',
+      url: transportUrl,
+      auth
+    })
+    const jar = {}
+    receiveCookies(jar, journey)
+    const response = await visitArrival(jar)
+
+    expect(response.statusCode).toBe(303)
+    expect(response.headers.location).toBe(transportUrl)
+    expect(notificationsClient.find).toHaveBeenCalledOnce()
+    expect(notificationsClient.create).not.toHaveBeenCalled()
+  })
+
+  test('shows the expired-session error when a draft token has no backend notification', async () => {
+    const journey = await server.inject({
+      method: 'GET',
+      url: transportUrl,
+      auth
+    })
+    const jar = {}
+    receiveCookies(jar, journey)
+    const crumb = cheerio
+      .load(journey.payload)('form input[name="crumb"]')
+      .val()
+    const response = await server.inject({
+      method: 'POST',
+      url,
+      auth,
+      headers: { cookie: cookieHeader(jar) },
+      payload: { ...validPayload, crumb }
+    })
+    const $ = cheerio.load(response.payload)
+
+    expect(response.statusCode).toBe(400)
+    expect($('main').text()).toContain('Your session has expired')
+    expect(notificationsClient.update).not.toHaveBeenCalled()
+    expect(notificationsClient.create).not.toHaveBeenCalled()
+  })
+
+  test('shows the expired-session error when the session has no draft for this organisation', async () => {
+    const journey = await server.inject({
+      method: 'GET',
+      url: transportUrl,
+      auth
+    })
+    const jar = {}
+    receiveCookies(jar, journey)
+    const crumb = cheerio
+      .load(journey.payload)('form input[name="crumb"]')
+      .val()
+    const otherOrganisation = {
+      ...auth,
+      credentials: {
+        ...auth.credentials,
+        organisationId: 'another-importer'
+      }
+    }
+    const response = await server.inject({
+      method: 'POST',
+      url,
+      auth: otherOrganisation,
+      headers: { cookie: cookieHeader(jar) },
+      payload: { ...validPayload, crumb }
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(cheerio.load(response.payload)('main').text()).toContain(
+      'Your session has expired'
+    )
+    expect(notificationsClient.update).not.toHaveBeenCalled()
+  })
+
+  test('pre-fills the saved port and local arrival fields from the API date and time', async () => {
+    const jar = await startDraft()
+    const id = drafts.keys().next().value
+    const draft = drafts.get(id)
+    drafts.set(id, {
+      ...draft,
+      notification: {
+        ...draft.notification,
+        arrival: {
+          portOfEntry: 'FELIXSTOWE',
+          expectedArrivalDate: '2027-06-15',
+          expectedArrivalTime: '09:05',
+          expectedArrivalAt: '2027-06-16T10:00:00Z',
+          borderControlPost: 'FELIXSTOWE'
+        }
+      }
+    })
+
+    const response = await visitArrival(jar)
+    const $ = cheerio.load(response.payload)
+
+    expect(response.statusCode).toBe(200)
+    expect($('#port').val()).toBe('FELIXSTOWE')
+    expect($('#port option:selected').text()).toBe('Felixstowe')
+    expect($('#port option[value="FELIXSTOWE"]')).toHaveLength(1)
+    expect($('#arrival-day').attr('value')).toBe('15')
+    expect($('#arrival-month').attr('value')).toBe('6')
+    expect($('#arrival-year').attr('value')).toBe('2027')
+    expect($('#arrival-hour').attr('value')).toBe('09')
+    expect($('#arrival-minute').attr('value')).toBe('05')
+  })
+
+  test('leaves an unknown saved port unselected while pre-filling the arrival', async () => {
+    const jar = await startDraft()
+    const id = drafts.keys().next().value
+    const draft = drafts.get(id)
+    drafts.set(id, {
+      ...draft,
+      notification: {
+        ...draft.notification,
+        arrival: {
+          portOfEntry: 'HEATHROW',
+          expectedArrivalDate: '2027-06-15',
+          expectedArrivalTime: '09:05',
+          expectedArrivalAt: '2027-06-15T08:05:00Z'
+        }
+      }
+    })
+
+    const $ = cheerio.load((await visitArrival(jar)).payload)
+
+    expect($('#port').val()).toBe('')
+    expect($('#arrival-day').attr('value')).toBe('15')
+    expect($('#arrival-month').attr('value')).toBe('6')
+  })
+
+  test('pre-fills a past arrival and applies the normal minimum-window check on submit', async () => {
+    const jar = await startDraft()
+    const id = drafts.keys().next().value
+    const draft = drafts.get(id)
+    drafts.set(id, {
+      ...draft,
+      notification: {
+        ...draft.notification,
+        arrival: {
+          portOfEntry: 'DOVER',
+          expectedArrivalDate: '2026-11-18',
+          expectedArrivalTime: '09:30',
+          expectedArrivalAt: '2026-11-18T09:30:00Z'
+        }
+      }
+    })
+
+    const response = await postArrival(jar, {
+      port: 'DOVER',
+      'arrival-day': '18',
+      'arrival-month': '11',
+      'arrival-year': '2026',
+      'arrival-hour': '09',
+      'arrival-minute': '30'
+    })
+    const $ = cheerio.load(response.payload)
+
+    expect(response.statusCode).toBe(400)
+    expect($('#port').val()).toBe('DOVER')
+    expect($('#arrival-day').val()).toBe('18')
+    expect($('.govuk-error-summary').text()).toContain(minimumMessage)
+    expect(notificationsClient.update).not.toHaveBeenCalled()
+  })
+
+  test('saves valid arrival details using the canonical API fields', async () => {
+    const response = await submit({
+      'arrival-day': '5',
+      'arrival-month': 'sept',
+      'arrival-year': '2027',
+      'arrival-hour': '9',
+      'arrival-minute': '5'
+    })
+
+    expect(response.statusCode).toBe(303)
+    expect(notificationsClient.update).toHaveBeenCalledExactlyOnceWith(
+      expect.any(Object),
+      expect.any(String),
+      {
+        organisationId: auth.credentials.organisationId,
+        notification: {
+          arrival: {
+            portOfEntry: 'DOVER',
+            expectedArrivalDate: '2027-09-05',
+            expectedArrivalTime: '09:05'
+          }
+        }
+      }
+    )
+    expect(notificationsClient.create).toHaveBeenCalledTimes(1)
+  })
+
+  test('shows an error page rather than redirecting when the API rejects an arrival patch', async () => {
+    notificationsClient.update.mockRejectedValue(
+      new Error('Notification API PATCH failed with status 400')
+    )
+
+    const response = await submit()
+    const $ = cheerio.load(response.payload)
+
+    expect(response.statusCode).toBe(500)
+    expect($('main h1').text()).toBe('500')
+    expect($('main').text()).toContain('Something went wrong')
+    expect(response.headers.location).toBeUndefined()
   })
 
   test('shows linked, matching errors for empty fields without redirecting', async () => {
@@ -190,7 +518,7 @@ describe('Consignment details journey', () => {
     expect($('#arrival-date input.govuk-input--error')).toHaveLength(3)
     expect($('#arrival-hour').hasClass('govuk-input--error')).toBe(true)
     expect($('#arrival-minute').hasClass('govuk-input--error')).toBe(true)
-    expectNoSession(response)
+    expect(notificationsClient.update).not.toHaveBeenCalled()
   })
 
   test('preserves values and highlights only a missing date component', async () => {
@@ -199,7 +527,7 @@ describe('Consignment details journey', () => {
     const $ = cheerio.load(response.payload)
 
     expect(response.statusCode).toBe(400)
-    expect($('#port').val()).toBe('dover')
+    expect($('#port').val()).toBe('DOVER')
     for (const [field, value] of Object.entries({
       ...validPayload,
       ...fields
@@ -397,12 +725,26 @@ describe('Consignment details journey', () => {
     }
   )
 
-  test('accepts a month name and redirects to a page not found without retaining a draft', async () => {
-    const response = await submit({ 'arrival-month': 'November' })
+  test('saves an arrival and pre-fills it when the user returns', async () => {
+    const jar = await startDraft()
+    const response = await postArrival(jar, { 'arrival-month': 'November' })
 
     expect(response.statusCode).toBe(303)
     expect(response.headers.location).toBe('/notification/next-step')
-    expectNoSession(response)
+    expect(notificationsClient.update).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(String),
+      {
+        organisationId: auth.credentials.organisationId,
+        notification: {
+          arrival: {
+            portOfEntry: 'DOVER',
+            expectedArrivalDate: '2026-11-20',
+            expectedArrivalTime: '09:30'
+          }
+        }
+      }
+    )
 
     const destination = await server.inject({
       method: 'GET',
@@ -420,27 +762,21 @@ describe('Consignment details journey', () => {
     expect($('main h1')).toHaveLength(1)
     expect($('main h1').text().trim()).toBe('404')
     expect($('main').text()).toContain('Page not found')
-    expectNoSession(destination)
 
-    const back = await server.inject({
-      method: 'GET',
-      url,
-      auth
-    })
-    const form = cheerio.load(back.payload)
+    const back = cheerio.load((await visitArrival(jar)).payload)
 
-    expect(form('#port').val()).toBe('')
-    expect(
-      form('main input:not([type="hidden"])')
-        .toArray()
-        .every((field) => (form(field).attr('value') ?? '') === '')
-    ).toBe(true)
-    expectNoSession(back)
+    expect(back('#port').val()).toBe('DOVER')
+    expect(back('#arrival-day').attr('value')).toBe('20')
+    expect(back('#arrival-month').attr('value')).toBe('11')
+    expect(back('#arrival-year').attr('value')).toBe('2026')
+    expect(back('#arrival-hour').attr('value')).toBe('09')
+    expect(back('#arrival-minute').attr('value')).toBe('30')
   })
 
   test('does not retain an invalid draft on a later GET', async () => {
-    await submit({ 'arrival-minute': '60' })
-    const response = await server.inject({ method: 'GET', url, auth })
+    const jar = await startDraft()
+    await postArrival(jar, { 'arrival-minute': '60' })
+    const response = await visitArrival(jar)
     const $ = cheerio.load(response.payload)
 
     expect($('#port').val()).toBe('')

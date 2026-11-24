@@ -36,10 +36,10 @@ The draft service translates the validated browser selection when constructing a
 
 ## Consignment details
 
-| Method | Path                                | Behavior                                                                                                                   |
-| ------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/notification/consignment-details` | Renders an empty port of entry and expected arrival date/time form with a Back link to transport details.                  |
-| POST   | `/notification/consignment-details` | Validates arrival details, redisplaying invalid values with HTTP 400 or redirecting with 303 to `/notification/next-step`. |
+| Method | Path                                | Behavior                                                                                                                                                        |
+| ------ | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/notification/consignment-details` | Loads a saved draft, pre-fills any saved arrival, and renders a Back link to transport details. Without a saved draft, redirects with 303 to transport details. |
+| POST   | `/notification/consignment-details` | Validates arrival details, PATCHes a saved draft, redisplaying invalid values with HTTP 400 or redirecting with 303 to `/notification/next-step`.               |
 
 - Consignment submissions require a CSRF token. Validation errors include a linked error summary, inline messages and an `Error:` page-title prefix.
 - [Arrival validation](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/consignment-details/validation.js) interprets the entered date and time in `Europe/London`. Arrival must be at least two elapsed hours and no more than one calendar year after the server-clock instant captured at submission. Both bounds are inclusive, and submission seconds and milliseconds are retained; at 14:30:45, the earliest valid minute is 16:31.
@@ -47,21 +47,25 @@ The draft service translates the validated browser selection when constructing a
 - Date and time are both required. Missing or malformed components retain their existing messages and field-specific highlighting; the combined arrival window is checked only once both date and time are complete and valid.
 - Below the minimum, including past arrivals, the message is "The expected date and time of arrival must be at least 2 hours in the future". Above the maximum, it is "The expected date and time of arrival must be no more than 1 year in the future". Either error highlights all five date/time inputs and appears beside both groups, with one summary entry linking to the day input.
 - A nonexistent arrival time instead shows "The expected time of arrival does not exist on this date because the UK clocks go forward", highlights hour and minute, and links one summary entry to hour. No window error is added for that input.
-- Port options are temporarily seeded, not loaded from a live directory. Existing form labels, examples and hints are unchanged.
-- The consignment page does not save arrival data, call the notification API or create/change a notification draft. It preserves the transport draft already held in the session.
-- Back from consignment loads transport details with the saved method selected. Revisiting consignment details loads an empty form.
+- Port options are temporarily seeded from the static [`ports.json`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/consignment-details/ports.json) file (read by `ports.js` at startup), not loaded from a live directory. A submitted port must match one of these values, otherwise "Select a port of entry from the list" is shown. Their option values are upper-case port codes while the visible names remain title case. The list currently contains seaports only, so an air freight importer cannot choose an airport; ask Jason who owns the port and airport reference data and when it will replace the seeded list.
+- A valid submission sends only `organisationId` and `notification.arrival` to `PATCH /notifications/{id}`. The payload uses the selected port code, `YYYY-MM-DD` and `HH:mm`. The page does not create a notification; if the session has no draft, or an unsaved session draft is missing from the backend, POST returns the "Your session has expired..." 400 error view.
+- The page does not send `borderControlPost`. The backend preserves its stored value. Port and border-control-post reconciliation is deferred, so the stored value can become stale when the port changes. A transport-mode change also leaves the arrival unchanged. Ask Jason who sets the border control post, from which reference data, and when reconciliation occurs.
+- GET pre-fills the port, date and time from `notification.arrival.portOfEntry`, `expectedArrivalDate` and `expectedArrivalTime` (not `expectedArrivalAt`). Day and month are shown without leading zeroes; hour and minute retain two digits. A port code absent from the seeded options is left unselected while the date and time remain. A saved arrival is pre-filled even if it is now past; submitting it again shows the normal minimum-window error.
+- Back from consignment loads transport details with the saved method selected. Revisiting consignment details loads saved arrival details from the backend.
 
 ## Draft session
 
 [`draft-session.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/draft-session.js) keeps a `notificationDraft` entry in the Yar session (see [Sessions and caching](sessions-and-caching.md)) holding `id`, optionally `reference`, the `organisationId` it was started under, and a `saved` flag.
 
 - `loadDraft` on a first visit allocates only a session journey token with a random UUID (`saved: false`) and returns `null`; it does not create a backend draft notification. Otherwise it looks the notification up through the API client and refreshes the session entry.
+- `loadSavedDraft` never starts a journey. It returns `null` when there is no session draft or when an unsaved session draft is not found on the backend; a saved draft missing from the backend still fails explicitly.
 - `saveDraft` looks up the notification first. If found, it remembers it as `saved: true` before attempting PATCH, including when recovering a creation whose response was lost. The submitted selection can differ from the recovered mode.
 - If an unsaved journey has no backend notification, `saveDraft` creates it with the existing journey UUID as the idempotency key. There is no automatic POST retry loop; a later submission performs GET-before-save again and retains the same UUID.
 - Once a notification is found, created or updated, the session entry is rewritten with its `id` and `reference` and `saved: true`.
 - `saveDraft` throws if there is no draft in the session ("No active notification journey").
+- `saveArrival` requires an existing draft on the backend, verifies the same organisation and reference checks as `saveDraft`, then PATCHes only the submitted arrival section. It never creates a notification. A missing unsaved backend draft returns `null` so the page can show its expired-session error.
 - Errors are thrown if the notification belongs to a different organisation, the reference differs from the one in the session (on load or save) or changes during an update, or a draft marked `saved` cannot be found.
-- The organisation ID comes from the signed-in user's credentials (`request.auth.credentials.organisationId`). An error is thrown if there is none.
+- The organisation ID comes from the signed-in user's credentials (`request.auth.credentials.organisationId`). An error ("No signed-in importer organisation") is thrown if there is none.
 - A session draft started under a different organisation is ignored, so a new draft is started when another organisation signs in on the same browser.
 - A failed PATCH after recovery leaves the recovered draft marked saved. If a later GET cannot find it, the service fails explicitly rather than recreating it.
 - Backend creation replays return the original creation representation, which can differ from the current mode after updates. Returning to transport details reads the current state through GET; it does not use a creation replay to restore the selected choice. No original-mode session field or additional recovery state machine is used.
@@ -74,9 +78,9 @@ The draft service translates the validated browser selection when constructing a
 | --------- | --------------------------- | ----------------------------------------------------------------------------- |
 | `find`    | `GET /notifications/{id}`   | A 404 returns `null`; other non-200 statuses throw.                           |
 | `create`  | `POST /notifications`       | Sends an `Idempotency-Key` header equal to the draft ID; 200 or 201 accepted. |
-| `update`  | `PATCH /notifications/{id}` | 200 accepted, including an unchanged mode.                                    |
+| `update`  | `PATCH /notifications/{id}` | 200 accepted; transport and arrival can be patched independently.             |
 
-Both writes send `Content-Type: application/json` with only the signed-in organisation and canonical transport mode:
+Each write sends `Content-Type: application/json` with only the signed-in organisation and the notification section being changed. A transport patch is:
 
 ```json
 {
@@ -89,9 +93,24 @@ Both writes send `Content-Type: application/json` with only the signed-in organi
 }
 ```
 
-This is the matching backend's documented partial-update contract, not JSON Merge Patch. Organisation and mode are required; empty patches, explicit nulls, legacy `transportMethod` and unsupported notification write fields are rejected with 400. The frontend constructs this minimal supported payload instead of echoing a fetched notification or its other sections.
+An arrival patch is:
 
-Successful responses use this required shape:
+```json
+{
+  "organisationId": "represented-importer",
+  "notification": {
+    "arrival": {
+      "portOfEntry": "FELIXSTOWE",
+      "expectedArrivalDate": "2027-06-15",
+      "expectedArrivalTime": "09:05"
+    }
+  }
+}
+```
+
+These are partial updates, not JSON Merge Patch. Organisation and at least one supported section are required; explicit nulls, legacy `transportMethod` and unsupported notification write fields are rejected with 400. The frontend constructs a minimal payload instead of echoing a fetched notification or its other sections.
+
+Successful responses include the following required envelope. The optional `arrival` section is shown when present:
 
 ```json
 {
@@ -102,6 +121,13 @@ Successful responses use this required shape:
   "notification": {
     "transport": {
       "mode": "AIR_FREIGHT"
+    },
+    "arrival": {
+      "portOfEntry": "FELIXSTOWE",
+      "expectedArrivalDate": "2027-06-15",
+      "expectedArrivalTime": "09:05",
+      "expectedArrivalAt": "2027-06-15T08:05:00Z",
+      "borderControlPost": "FELIXSTOWE"
     }
   },
   "createdAt": "2026-11-16T16:00:00.123Z",
@@ -114,12 +140,12 @@ Successful responses use this required shape:
 - GET returns 200 with current state. Only GET 404 returns `null`; failed writes, other unexpected statuses, malformed responses and network/timeout errors propagate as failures and do not produce a successful browser redirect.
 - The configured tracing header (`TRACING_HEADER`) is forwarded when present on the incoming request.
 - Redirects are not followed, and requests time out after 10 seconds.
-- Joi requires `id` (UUID), `reference` (pattern `GBN-FIS-NN-XXXXX`), `status` of `DRAFT`, `organisationId`, ISO `createdAt` and `updatedAt`, and nested `notification.transport.mode` in the canonical set. Legacy flat responses are not an alternative contract.
-- The returned `id` must match the request. For writes, the organisation and canonical response mode must match the canonical request mode, not the browser presentation value.
+- Joi requires `id` (UUID), `reference` (pattern `GBN-FIS-NN-XXXXX`), `status` of `DRAFT`, `organisationId`, ISO `createdAt` and `updatedAt`, and nested `notification.transport.mode` in the canonical set. `notification.arrival` is optional; when present its port code, date, time and `expectedArrivalAt` are validated. Additional arrival fields such as `borderControlPost` are accepted and preserved. Legacy flat responses are not an alternative contract.
+- The returned `id` must match the request. For writes, the organisation and every field in each submitted notification section must match the response in the same canonical form as the request.
 - Validation preserves additional response sections and metadata, including within `notification` and `transport`. It checks the required frontend subset, not the complete backend schema, and does not reject or strip sections simply because the frontend cannot edit them.
 
 ## Validation boundaries and release dependency
 
-The existing [API-client tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/client.test.js) mock fetch. [Draft-session tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/draft-session.test.js) mock the API client, while [transport-route tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/transport-details/controller.test.js) exercise the real frontend through `server.inject()` with that client mocked. [Model tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/transport-details/model.test.js) exercise form validation and presentation directly. These tests cover the frontend contract and recovery safeguards; they do not prove compatibility with a running backend or backend timestamp refresh behaviour. Real frontend-backend checks must be reported separately.
+The existing [API-client tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/client.test.js) mock fetch. [Draft-session tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/draft-session.test.js) mock the API client, while the [transport-route tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/transport-details/controller.test.js) and [consignment-route tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/consignment-details/controller.test.js) exercise the real frontend through `server.inject()` with that client mocked. The [arrival-validation tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/consignment-details/validation.test.js) cover form validation and API formatting; [transport-model tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/transport-details/model.test.js) exercise transport form presentation. These tests cover the frontend contract and recovery safeguards; they do not prove compatibility with a running backend or backend timestamp refresh behaviour. Real frontend-backend checks must be reported separately.
 
-This frontend requires the matching backend release implementing the nested canonical transport POST/PATCH/GET contract described above. It has no legacy API compatibility path. See [Deployment](deployment.md#notification-api-release-dependency) for the release dependency; coordination remains a separate team decision.
+This frontend requires the matching backend release implementing nested canonical transport creation, transport and arrival PATCH, and GET as described above. It has no legacy API compatibility path. See [Deployment](deployment.md#notification-api-release-dependency) for the release dependency; coordination remains a separate team decision.

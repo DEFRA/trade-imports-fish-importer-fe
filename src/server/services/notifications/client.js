@@ -18,7 +18,19 @@ const notificationSchema = Joi.object({
         .required()
     })
       .unknown(true)
-      .required()
+      .required(),
+    arrival: Joi.object({
+      portOfEntry: Joi.string()
+        .pattern(/^[A-Z0-9-]+$/)
+        .required(),
+      expectedArrivalDate: Joi.string()
+        .pattern(/^\d{4}-\d{2}-\d{2}$/)
+        .required(),
+      expectedArrivalTime: Joi.string()
+        .pattern(/^([01]\d|2[0-3]):[0-5]\d$/)
+        .required(),
+      expectedArrivalAt: Joi.string().isoDate().strict().required()
+    }).unknown(true)
   })
     .unknown(true)
     .required(),
@@ -54,15 +66,22 @@ function verifyNotification(notification, id, payload) {
   if (notification.id !== id) {
     throw new Error('Notification API returned a different draft identity')
   }
-  if (
-    payload &&
-    (notification.organisationId !== payload.organisationId ||
-      notification.notification.transport.mode !==
-        payload.notification.transport.mode)
-  ) {
-    throw new Error(
-      'Notification API response does not match the saved details'
+  if (payload) {
+    const detailsDiffer = Object.entries(payload.notification).some(
+      ([section, fields]) =>
+        Object.entries(fields).some(
+          ([field, value]) =>
+            notification.notification[section]?.[field] !== value
+        )
     )
+    if (
+      notification.organisationId !== payload.organisationId ||
+      detailsDiffer
+    ) {
+      throw new Error(
+        'Notification API response does not match the saved details'
+      )
+    }
   }
 }
 

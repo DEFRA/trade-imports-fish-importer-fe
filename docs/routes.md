@@ -13,7 +13,7 @@ The [router plugin](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob
 | GET    | `/notification/transport-details`   | Renders the transport method radios, preselected from the saved draft. See [Notification journey](notification-journey.md).                                 |
 | POST   | `/notification/transport-details`   | Validates and saves the transport method, then redirects (303) to `/notification/consignment-details`. See [Notification journey](notification-journey.md). |
 | GET    | `/notification/consignment-details` | Renders the port of entry and expected arrival date/time form, with a Back link to transport details.                                                       |
-| POST   | `/notification/consignment-details` | Validates arrival details without saving them, then redirects (303) to `/notification/next-step`.                                                           |
+| POST   | `/notification/consignment-details` | Validates arrival details, PATCHes them to the saved draft, then redirects (303) to `/notification/next-step`.                                              |
 
 Application routes require the `session` authentication strategy by default. `/health`, `/cookies` (GET and POST) and the static asset routes set `auth: false`, so they are public. Unauthenticated GET requests are redirected to `/auth/sign-in` when test user sign-in is enabled; other requests receive HTTP 401. See [Security](security.md).
 

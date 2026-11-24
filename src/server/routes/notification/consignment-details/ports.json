@@ -1,10 +1,10 @@
 [
-  { "value": "dover", "text": "Dover" },
-  { "value": "felixstowe", "text": "Felixstowe" },
-  { "value": "grimsby", "text": "Grimsby" },
-  { "value": "hull", "text": "Hull" },
-  { "value": "immingham", "text": "Immingham" },
-  { "value": "liverpool", "text": "Liverpool" },
-  { "value": "portsmouth", "text": "Portsmouth" },
-  { "value": "tilbury", "text": "Tilbury" }
+  { "value": "DOVER", "text": "Dover" },
+  { "value": "FELIXSTOWE", "text": "Felixstowe" },
+  { "value": "GRIMSBY", "text": "Grimsby" },
+  { "value": "HULL", "text": "Hull" },
+  { "value": "IMMINGHAM", "text": "Immingham" },
+  { "value": "LIVERPOOL", "text": "Liverpool" },
+  { "value": "PORTSMOUTH", "text": "Portsmouth" },
+  { "value": "TILBURY", "text": "Tilbury" }
 ]
