@@ -1,7 +1,5 @@
 import { readFile } from 'node:fs/promises'
 
-import { config } from '#/config/config.js'
-
 let cached
 
 const identity = (value) => value.trim().toLowerCase()
@@ -51,37 +49,16 @@ function validateCommodities(data) {
   return data
 }
 
-async function loadCommodities(logger) {
-  try {
-    const base = config.get('referenceDataApiUrl')
-    const path = config.get('commoditiesPath')
-    if (!base || !path) {
-      throw new Error('Reference data API URL or commodities path is not set')
-    }
-    const url = new URL(path, base)
-    const response = await fetch(url, {
-      redirect: 'manual',
-      signal: AbortSignal.timeout(10000)
-    })
-    if (!response.ok) {
-      throw new Error(`Reference data API returned ${response.status}`)
-    }
-    return validateCommodities(await response.json())
-  } catch (error) {
-    if (!config.get('isDevelopment')) {
-      throw error
-    }
-    logger.warn({ err: error }, 'Using development commodity reference data')
-    const fixture = JSON.parse(
-      await readFile(new URL('./commodities.json', import.meta.url), 'utf8')
-    )
-    return validateCommodities(fixture)
-  }
+async function loadCommodities() {
+  const data = JSON.parse(
+    await readFile(new URL('./commodities.json', import.meta.url), 'utf8')
+  )
+  return validateCommodities(data)
 }
 
-export async function getCommodities(logger) {
+export async function getCommodities() {
   if (!cached) {
-    cached = loadCommodities(logger).catch((error) => {
+    cached = loadCommodities().catch((error) => {
       cached = undefined
       throw error
     })

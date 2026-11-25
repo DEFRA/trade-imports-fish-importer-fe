@@ -164,7 +164,20 @@ Successful responses include the following required envelope. The optional `arri
 | GET    | `/notification/commodity-details` | Loads reference commodity data and renders the commodity selection interface with saved commodity rows. |
 | POST   | `/notification/commodity-details` | Validates and saves committed commodities; returns JSON with status 200 on success or an error message. |
 
-The commodity details page requires loaded reference data from [`getCommodities()`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/reference-data/commodities.js). The page renders with the reference data, pre-filled from any previously saved commodities in the session draft. The client-side script [`commodity-details.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/client/javascripts/commodity-details.js) handles the interactive dropdown selections and form submission.
+The commodity details page loads bundled, seeded reference data from
+[`commodities.json`](../src/server/services/reference-data/commodities.json)
+through [`getCommodities()`](../src/server/services/reference-data/commodities.js)
+in both local and deployed environments, regardless of `NODE_ENV`. No external
+commodity reference API is called, and `REFERENCE_DATA_API_URL` and
+`COMMODITIES_PATH` are not used. The data is validated and cached on first use;
+failed loads are not cached. If the file cannot be read or its data is invalid,
+the controller logs the error and returns the "Commodity service unavailable"
+503 page.
+
+The page renders with the reference data, pre-filled from any previously saved
+commodities in the session draft. The client-side script
+[`commodity-details.js`](../src/client/javascripts/commodity-details.js) handles
+the interactive dropdown selections and form submission.
 
 POST validates the submitted commodity list JSON payload:
 

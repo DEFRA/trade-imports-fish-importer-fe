@@ -79,7 +79,7 @@ export const getCommodityDetailsController = {
   async handler(request, h) {
     let commodities
     try {
-      commodities = await getCommodities(request.logger)
+      commodities = await getCommodities()
     } catch (error) {
       request.logger.error({ err: error }, 'Reference data unavailable')
       return h

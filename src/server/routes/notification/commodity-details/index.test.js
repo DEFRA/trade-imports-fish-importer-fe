@@ -1,4 +1,5 @@
 import { load } from 'cheerio'
+import { readFile } from 'node:fs/promises'
 import { config } from '#/config/config.js'
 import { createServer } from '#/server/server.js'
 import { notificationsClient } from '#/server/services/notifications/client.js'
@@ -24,20 +25,8 @@ describe('commodity details routes', () => {
   let server
 
   beforeAll(async () => {
-    config.set('referenceDataApiUrl', 'https://reference.example')
-    config.set('commoditiesPath', '/commodities')
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        Response.json([
-          {
-            code: '03021400',
-            name: 'Fresh salmon',
-            species: [{ faoCode: 'SAL', commonName: 'Atlantic salmon' }]
-          }
-        ])
-      )
-    )
+    config.set('isDevelopment', false)
+    vi.stubGlobal('fetch', vi.fn())
     server = await createServer()
     await server.initialize()
   })
@@ -49,18 +38,6 @@ describe('commodity details routes', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        Response.json([
-          {
-            code: '03021400',
-            name: 'Fresh salmon',
-            species: [{ faoCode: 'SAL', commonName: 'Atlantic salmon' }]
-          }
-        ])
-      )
-    )
     notificationsClient.find.mockImplementation(async (_request, id) => ({
       id,
       reference: 'GBN-FIS-26-AXN04',
@@ -87,7 +64,7 @@ describe('commodity details routes', () => {
     expect(routes.map((route) => route.method).sort()).toEqual(['get', 'post'])
   })
 
-  test('shows the commodity form with the transport back link', async () => {
+  test('shows the seeded commodity form outside development without an API', async () => {
     const response = await server.inject({
       method: 'GET',
       url: '/notification/commodity-details',
@@ -101,6 +78,19 @@ describe('commodity details routes', () => {
     )
     expect($('.govuk-back-link').prevAll('.govuk-phase-banner')).toHaveLength(1)
     expect($('[data-commodity-form] input[name="crumb"]')).toHaveLength(1)
+    const expected = JSON.parse(
+      await readFile(
+        new URL(
+          '../../../services/reference-data/commodities.json',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    )
+    expect(
+      JSON.parse($('[data-commodity-form]').attr('data-reference'))
+    ).toEqual(expected)
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   test('provides the commodity, species and weight controls', async () => {

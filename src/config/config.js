@@ -83,18 +83,6 @@ export const config = convict({
     default: defaultNotificationApiUrl(),
     env: 'NOTIFICATION_API_URL'
   },
-  referenceDataApiUrl: {
-    doc: 'Base URL for the commodity reference data API',
-    format: String,
-    default: '',
-    env: 'REFERENCE_DATA_API_URL'
-  },
-  commoditiesPath: {
-    doc: 'Path for the commodity reference data API',
-    format: String,
-    default: '',
-    env: 'COMMODITIES_PATH'
-  },
   root: {
     doc: 'Project root',
     format: String,

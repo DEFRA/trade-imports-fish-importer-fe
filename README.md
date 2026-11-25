@@ -67,9 +67,11 @@ in the past.
 Entered consignment values are redisplayed on validation errors. A successful
 consignment POST saves the arrival, country of export and any required CHED
 reference to the existing draft and redirects to `/notification/commodity-details`.
-The commodity details page loads reference data and allows entry of commodity
-codes, species and weights. Returning to consignment details loads the saved details from the
-backend.
+The commodity details page uses bundled, seeded reference data from
+[commodities.json](src/server/services/reference-data/commodities.json) in both
+local and deployed environments and allows entry of commodity codes, species and
+weights. No external commodity reference API configuration is required. Returning
+to consignment details loads the saved details from the backend.
 
 The additional details section asks for the country of export. Countries are
 temporary seeded data in
