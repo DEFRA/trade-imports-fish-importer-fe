@@ -166,6 +166,8 @@ Successful responses include the following required envelope. The optional `arri
 
 The commodity details page requires loaded reference data from [`getCommodities()`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/reference-data/commodities.js). The page renders with the reference data, pre-filled from any previously saved commodities in the session draft. The client-side script [`commodity-details.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/client/javascripts/commodity-details.js) handles the interactive dropdown selections and form submission.
 
+Reference data loading, validation, and fallback behavior are described in [Reference data](reference-data.md).
+
 POST validates the submitted commodity list JSON payload:
 
 - Each commodity must have a `commodityCode`, optional `description`, and a non-empty `species` array.
