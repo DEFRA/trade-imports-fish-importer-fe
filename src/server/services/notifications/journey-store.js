@@ -50,7 +50,10 @@ export function createJourneyStore(ttl, redisClient) {
           ttl,
           'NX'
         )
-      } else if (!memoryState(sessionId)) {
+        return
+      }
+
+      if (!memoryState(sessionId)) {
         setMemoryState(sessionId, state)
       }
     },
