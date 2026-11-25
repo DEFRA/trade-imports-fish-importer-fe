@@ -58,12 +58,12 @@ describe('#homeController', () => {
     expect(serviceNavigation.find('a')).toHaveLength(0)
   })
 
-  test('shows the alpha phase banner with the feedback link', async () => {
+  test('shows the beta phase banner with the feedback link', async () => {
     const { result } = await server.inject({ method: 'GET', url: '/', auth })
     const $ = cheerio.load(result)
     const banner = $('.govuk-phase-banner')
 
-    expect(banner.find('.govuk-tag').text().trim()).toBe('Alpha')
+    expect(banner.find('.govuk-tag').text().trim()).toBe('Beta')
     expect(banner.find('.govuk-phase-banner__text').text().trim()).toBe(
       'This is a new service – your feedback will help us improve it.'
     )
