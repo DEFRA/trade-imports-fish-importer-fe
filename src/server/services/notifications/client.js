@@ -23,7 +23,7 @@ const requestTimeoutMs = 10000
 function buildHeaders(request, id, method, payload) {
   const headers = { accept: 'application/json' }
   const traceHeader = config.get('tracing.header')
-  const traceId = request.headers[traceHeader]
+  const traceId = request.headers[traceHeader.toLowerCase()]
   if (traceId) {
     headers[traceHeader] = traceId
   }

@@ -47,6 +47,21 @@ describe('notificationsClient', () => {
     expect(options.signal).toBeInstanceOf(AbortSignal)
   })
 
+  test('forwards a configured mixed-case tracing header', async () => {
+    const previousHeader = config.get('tracing.header')
+    config.set('tracing.header', 'X-Cdp-Request-Id')
+    try {
+      fetchMock.mockResolvedValue(Response.json(notification))
+      await notificationsClient.find(request, id)
+      expect(fetchMock.mock.calls[0][1].headers).toHaveProperty(
+        'X-Cdp-Request-Id',
+        'test-trace'
+      )
+    } finally {
+      config.set('tracing.header', previousHeader)
+    }
+  })
+
   test('reads and updates the same draft without sending another creation key', async () => {
     fetchMock.mockImplementation(async () => Response.json(notification))
     await notificationsClient.find({ headers: {} }, id)

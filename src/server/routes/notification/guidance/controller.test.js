@@ -129,7 +129,7 @@ describe('#guidanceController', () => {
     ])
   })
 
-  test('Should offer a protected Start now action without creating a draft', async () => {
+  test('Should offer a protected Start now action without creating a backend draft', async () => {
     const { result, headers } = await server.inject({
       method: 'GET',
       url: '/notification/guidance',
@@ -151,6 +151,6 @@ describe('#guidanceController', () => {
       (headers['set-cookie'] ?? []).some((cookie) =>
         cookie.startsWith(`${config.get('session.cache.name')}=`)
       )
-    ).toBe(false)
+    ).toBe(true)
   })
 })

@@ -27,12 +27,12 @@ Allowed `transportMethod` values come from [`transport-methods.js`](https://gith
 
 ## Draft session
 
-[`draft-session.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/draft-session.js) keeps the current `notificationDraft` entry in the Yar session (see [Sessions and caching](sessions-and-caching.md)) holding `id`, the `organisationId` it was started under and, for older sessions, optionally `reference` and a `saved` flag. It also remembers Start request IDs in the session so a delayed retry cannot reactivate a superseded journey.
+[`draft-session.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/draft-session.js) uses the browser's opaque Yar session ID to access a separate journey store (see [Sessions and caching](sessions-and-caching.md)). The store holds the current journey ID and organisation, plus used Start IDs. Start registration and replacement are atomic across instances sharing Redis, so overlapping Starts cannot lose a used ID or reactivate an older journey on retry while the journey session is valid. Existing Yar `notificationDraft` and `notificationStartedJourneys` entries are migrated on first access.
 
-- Starting from guidance reserves a UUID in the browser session (`saved: false`); it does not persist a notification until the first valid Transport details save. `loadDraft` looks up an existing notification through the API client and refreshes the session entry.
+- Viewing guidance establishes an opaque browser session, but only Start reserves a journey UUID (`saved: false`). No backend notification is persisted until the first valid Transport details save. `loadDraft` looks up an existing notification through the API client.
 - `saveDraft` looks up the existing notification first (to recover a first save whose response was lost), then updates it, or creates it if it does not exist.
-- Once a notification is found, created or updated, its identity and reference are stored in a separate `saved-notification-drafts` cache segment. Loading and saving do not rewrite the Yar session, so a slow request for an older journey cannot restore it after a later Start.
-- `saveDraft` throws if there is no draft in the session ("No active notification journey").
+- Once a notification is found, created or updated, its identity and reference are stored in a separate `saved-notification-drafts` cache segment. Loading and saving do not rewrite the journey state, so a slow request for an older journey cannot restore it after a later Start.
+- `saveDraft` throws if there is no active journey ("No active notification journey").
 - Errors are thrown if the notification belongs to a different organisation, the reference differs from the one in the session or saved-draft cache (on load or save) or changes during an update, or a previously saved draft cannot be found.
 - The organisation ID comes from the signed-in user's credentials (`request.auth.credentials.organisationId`). An error is thrown if there is none.
 - A session draft started under a different organisation is ignored. Transport details redirects to guidance until the new organisation explicitly starts its own journey.

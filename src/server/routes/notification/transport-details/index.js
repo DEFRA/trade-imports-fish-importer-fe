@@ -24,8 +24,8 @@ export const transportDetails = {
           options: {
             validate: {
               payload: transportDetailsSchema,
-              failAction(request, h) {
-                const draft = currentDraft(request)
+              async failAction(request, h) {
+                const draft = await currentDraft(request)
                 if (draft && draft.id !== request.payload?.journeyId) {
                   return h.redirect(path).code(statusCodes.seeOther).takeover()
                 }

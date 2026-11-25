@@ -1,5 +1,11 @@
-import { currentDraft, loadDraft, saveDraft } from './draft-session.js'
+import {
+  currentDraft,
+  loadDraft,
+  saveDraft,
+  startDraft
+} from './draft-session.js'
 import { notificationsClient } from './client.js'
+import { createJourneyStore } from './journey-store.js'
 
 vi.mock('./client.js', () => ({
   notificationsClient: {
@@ -10,6 +16,7 @@ vi.mock('./client.js', () => ({
 }))
 
 const organisationId = 'test-org-north-quay-seafood'
+const journeyId = 'a495eae6-c0c8-4b79-b032-f0bb8f2f377e'
 
 function saved(id, transportMethod = 'air-freight') {
   return {
@@ -31,6 +38,7 @@ describe('notification draft session', () => {
       auth: { credentials: { organisationId } },
       server: {
         app: {
+          notificationJourneyStore: createJourneyStore(3600000),
           savedNotificationDrafts: {
             get: async (id) => savedDrafts.get(id),
             set: async (id, value) => savedDrafts.set(id, value)
@@ -38,6 +46,7 @@ describe('notification draft session', () => {
         }
       },
       yar: {
+        id: 'browser-session',
         get: (key) => store.get(key),
         set: (key, value) => store.set(key, value)
       }
@@ -51,16 +60,21 @@ describe('notification draft session', () => {
     )
   })
 
-  test('first GET allocates only a session token and makes no backend draft', async () => {
-    expect(await loadDraft(request)).toBeNull()
-    expect(currentDraft(request).id).toMatch(/^[a-f0-9-]{36}$/)
+  async function beginJourney(id = journeyId) {
+    await startDraft(request, id)
+  }
+
+  test('Start allocates only a journey identity and makes no backend draft', async () => {
+    await beginJourney()
     expect(notificationsClient.find).not.toHaveBeenCalled()
     expect(notificationsClient.create).not.toHaveBeenCalled()
+    expect(await loadDraft(request)).toBeNull()
+    expect((await currentDraft(request)).id).toBe(journeyId)
   })
 
   test('first save creates once and later saves update the same ID/reference', async () => {
-    await loadDraft(request)
-    const id = currentDraft(request).id
+    await beginJourney()
+    const id = (await currentDraft(request)).id
     await saveDraft(request, 'air-freight')
     notificationsClient.find.mockResolvedValue(saved(id))
     await saveDraft(request, 'road-vehicle')
@@ -74,17 +88,17 @@ describe('notification draft session', () => {
       id,
       { organisationId, transportMethod: 'road-vehicle' }
     )
-    expect(currentDraft(request).id).toBe(id)
+    expect((await currentDraft(request)).id).toBe(id)
   })
 
   test('recovers a committed save after a lost response, including a changed selection', async () => {
-    await loadDraft(request)
-    const id = currentDraft(request).id
+    await beginJourney()
+    const id = (await currentDraft(request)).id
     notificationsClient.create.mockRejectedValueOnce(new Error('Lost response'))
     await expect(saveDraft(request, 'air-freight')).rejects.toThrow(
       'Lost response'
     )
-    expect(currentDraft(request).id).toBe(id)
+    expect((await currentDraft(request)).id).toBe(id)
     notificationsClient.find.mockResolvedValue(saved(id))
     await saveDraft(request, 'road-vehicle')
     expect(notificationsClient.create).toHaveBeenCalledTimes(1)
@@ -95,14 +109,16 @@ describe('notification draft session', () => {
   })
 
   test('returning after a lost create response shows the persisted choice', async () => {
-    await loadDraft(request)
-    notificationsClient.find.mockResolvedValue(saved(currentDraft(request).id))
+    await beginJourney()
+    notificationsClient.find.mockResolvedValue(
+      saved((await currentDraft(request)).id)
+    )
     expect((await loadDraft(request)).transportMethod).toBe('air-freight')
   })
 
   test('a failed creation retry keeps its original key', async () => {
-    await loadDraft(request)
-    const id = currentDraft(request).id
+    await beginJourney()
+    const id = (await currentDraft(request)).id
     notificationsClient.create.mockRejectedValueOnce(new Error('Unavailable'))
     await expect(saveDraft(request, 'air-freight')).rejects.toThrow(
       'Unavailable'
@@ -114,7 +130,7 @@ describe('notification draft session', () => {
   })
 
   test('does not silently recreate a missing saved draft', async () => {
-    await loadDraft(request)
+    await beginJourney()
     await saveDraft(request, 'air-freight')
     await expect(saveDraft(request, 'road-vehicle')).rejects.toThrow(
       'could not be found'
@@ -123,8 +139,8 @@ describe('notification draft session', () => {
   })
 
   test('remembers a recovered draft so a failed update cannot lead to recreation', async () => {
-    await loadDraft(request)
-    const id = currentDraft(request).id
+    await beginJourney()
+    const id = (await currentDraft(request)).id
     notificationsClient.find.mockResolvedValueOnce(saved(id))
     notificationsClient.update.mockRejectedValueOnce(
       new Error('Notification API PUT failed with status 404')
@@ -137,8 +153,8 @@ describe('notification draft session', () => {
   })
 
   test('rejects another organisation and an unexpectedly changed reference', async () => {
-    await loadDraft(request)
-    const id = currentDraft(request).id
+    await beginJourney()
+    const id = (await currentDraft(request)).id
     notificationsClient.find.mockResolvedValue({
       ...saved(id),
       organisationId: 'another'
@@ -160,7 +176,7 @@ describe('notification draft session', () => {
 
   test('saves under the signed-in organisation', async () => {
     request.auth.credentials.organisationId = 'test-org-harbour-fish'
-    await loadDraft(request)
+    await beginJourney()
     await saveDraft(request, 'air-freight')
     expect(notificationsClient.create).toHaveBeenCalledWith(
       request,
@@ -173,18 +189,18 @@ describe('notification draft session', () => {
   })
 
   test('a different organisation signing in starts a fresh draft', async () => {
-    await loadDraft(request)
-    const id = currentDraft(request).id
+    await beginJourney()
+    const id = (await currentDraft(request)).id
     request.auth.credentials.organisationId = 'test-org-harbour-fish'
-    expect(currentDraft(request)).toBeNull()
-    expect(await loadDraft(request)).toBeNull()
-    expect(currentDraft(request).id).not.toBe(id)
+    expect(await currentDraft(request)).toBeNull()
+    await beginJourney('90d79b91-40b1-4daf-ad0e-bf554aeb56f3')
+    expect((await currentDraft(request)).id).not.toBe(id)
     expect(notificationsClient.find).not.toHaveBeenCalled()
   })
 
   test('requires a signed-in organisation', async () => {
     request.auth = undefined
-    await expect(loadDraft(request)).rejects.toThrow(
+    await expect(currentDraft(request)).rejects.toThrow(
       'No signed-in importer organisation'
     )
   })

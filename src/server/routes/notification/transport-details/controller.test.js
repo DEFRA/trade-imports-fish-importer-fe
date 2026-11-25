@@ -1,4 +1,5 @@
 import { load } from 'cheerio'
+import { config } from '#/config/config.js'
 import { createServer } from '#/server/server.js'
 import { notificationsClient } from '#/server/services/notifications/client.js'
 
@@ -42,9 +43,16 @@ function cookieHeader(jar) {
 describe('transport details routes', () => {
   let server
 
+  async function initializeServer(instance) {
+    await instance.initialize()
+    await vi.waitFor(() =>
+      expect(instance.app.savedNotificationDrafts.isReady()).toBe(true)
+    )
+  }
+
   beforeAll(async () => {
     server = await createServer()
-    await server.initialize()
+    await initializeServer(server)
   })
 
   afterAll(async () => {
@@ -359,6 +367,75 @@ describe('transport details routes', () => {
       currentId
     )
     expect(notificationsClient.create).not.toHaveBeenCalled()
+  })
+
+  test('overlapping Starts cannot forget a superseded Start identity', async () => {
+    const journey = await visit()
+    const startForms = await Promise.all(
+      [0, 1].map(async () => {
+        const guidance = await server.inject({
+          url: '/notification/guidance',
+          auth,
+          headers: { cookie: cookieHeader(journey.jar) }
+        })
+        const $ = load(guidance.payload)
+        return {
+          crumb: $('form input[name="crumb"]').val(),
+          journeyId: $('form input[name="journeyId"]').val()
+        }
+      })
+    )
+    const secondServer =
+      config.get('session.cache.engine') === 'redis'
+        ? await createServer()
+        : server
+    try {
+      if (secondServer !== server) {
+        await initializeServer(secondServer)
+      }
+      const responses = await Promise.all(
+        [server, secondServer].map((instance, index) =>
+          instance.inject({
+            method: 'POST',
+            url: '/notification/guidance',
+            auth,
+            headers: { cookie: cookieHeader(journey.jar) },
+            payload: startForms[index]
+          })
+        )
+      )
+      expect(responses.map(({ statusCode }) => statusCode)).toEqual([303, 303])
+    } finally {
+      if (secondServer !== server) {
+        await secondServer.stop({ timeout: 0 })
+      }
+    }
+    const current = await server.inject({
+      url: path,
+      auth,
+      headers: { cookie: cookieHeader(journey.jar) }
+    })
+    const currentId = load(current.payload)(
+      'form input[name="journeyId"]'
+    ).val()
+    expect(startForms.map(({ journeyId }) => journeyId)).toContain(currentId)
+    const oldStart = startForms.find(({ journeyId }) => journeyId !== currentId)
+    const retried = await server.inject({
+      method: 'POST',
+      url: '/notification/guidance',
+      auth,
+      headers: { cookie: cookieHeader(journey.jar) },
+      payload: oldStart
+    })
+    expect(retried.statusCode).toBe(303)
+    const afterRetry = await server.inject({
+      url: path,
+      auth,
+      headers: { cookie: cookieHeader(journey.jar) }
+    })
+    expect(load(afterRetry.payload)('form input[name="journeyId"]').val()).toBe(
+      currentId
+    )
   })
 
   test('a slow load cannot restore a journey superseded by Start now', async () => {

@@ -35,7 +35,8 @@ describe('server-side draft session storage', () => {
         }
       })
       const name = config.get('session.cache.name')
-      const cookie = response.headers['set-cookie']
+      expect(response.statusCode).toBe(303)
+      const cookie = guidance.headers['set-cookie']
         .find((value) => value.startsWith(`${name}=`))
         .split(';')[0]
       const { states } = await server.states.parse(cookie)

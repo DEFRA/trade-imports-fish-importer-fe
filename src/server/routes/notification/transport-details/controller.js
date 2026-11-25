@@ -8,24 +8,21 @@ import { transportDetailsModel } from './model.js'
 
 export const getTransportDetailsController = {
   async handler(request, h) {
-    if (!currentDraft(request)) {
+    const draft = await currentDraft(request)
+    if (!draft) {
       return h.redirect('/notification/guidance').code(statusCodes.seeOther)
     }
-    const notification = await loadDraft(request)
+    const notification = await loadDraft(request, draft)
     return h.view(
       'notification/transport-details/index',
-      transportDetailsModel(
-        notification?.transportMethod,
-        false,
-        currentDraft(request).id
-      )
+      transportDetailsModel(notification?.transportMethod, false, draft.id)
     )
   }
 }
 
 export const postTransportDetailsController = {
   async handler(request, h) {
-    const draft = currentDraft(request)
+    const draft = await currentDraft(request)
     if (!draft) {
       return h
         .view('error/index', {
@@ -41,7 +38,7 @@ export const postTransportDetailsController = {
         .redirect('/notification/transport-details')
         .code(statusCodes.seeOther)
     }
-    await saveDraft(request, request.payload.transportMethod)
+    await saveDraft(request, request.payload.transportMethod, draft)
     return h
       .redirect('/notification/consignment-arrival-details')
       .code(statusCodes.seeOther)
