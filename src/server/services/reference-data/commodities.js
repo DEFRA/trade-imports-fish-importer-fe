@@ -68,7 +68,7 @@ async function loadCommodities(logger) {
     }
     return validateCommodities(await response.json())
   } catch (error) {
-    if (!config.get('isDevelopment')) {
+    if (config.get('isProduction')) {
       throw error
     }
     logger.warn({ err: error }, 'Using development commodity reference data')
