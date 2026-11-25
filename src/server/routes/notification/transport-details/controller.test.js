@@ -605,4 +605,18 @@ describe('transport details routes', () => {
     expect(response.payload).toContain('Your session has expired')
     expect(notificationsClient.create).not.toHaveBeenCalled()
   })
+
+  test('an invalid selection without the journey session redirects to guidance', async () => {
+    const journey = await visit()
+    journey.jar = { crumb: journey.jar.crumb }
+    notificationsClient.find.mockClear()
+
+    const response = await submit(journey, '')
+
+    expect(response.statusCode).toBe(303)
+    expect(response.headers.location).toBe('/notification/guidance')
+    expect(notificationsClient.find).not.toHaveBeenCalled()
+    expect(notificationsClient.create).not.toHaveBeenCalled()
+    expect(notificationsClient.update).not.toHaveBeenCalled()
+  })
 })

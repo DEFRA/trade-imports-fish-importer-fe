@@ -72,6 +72,19 @@ describe('notification draft session', () => {
     expect((await currentDraft(request)).id).toBe(journeyId)
   })
 
+  test('migrates the legacy journey and prevents replay of a superseded Start', async () => {
+    const previousId = '90d79b91-40b1-4daf-ad0e-bf554aeb56f3'
+    const nextId = '0dddb858-bf94-40bb-83c7-8b35523c0120'
+    const legacy = { id: journeyId, organisationId, saved: false }
+    request.yar.set('notificationDraft', legacy)
+    request.yar.set('notificationStartedJourneys', [previousId, journeyId])
+
+    expect(await currentDraft(request)).toEqual(legacy)
+    expect(await startDraft(request, previousId)).toBe(false)
+    expect(await startDraft(request, nextId)).toBe(true)
+    expect(await currentDraft(request)).toEqual({ ...legacy, id: nextId })
+  })
+
   test('first save creates once and later saves update the same ID/reference', async () => {
     await beginJourney()
     const id = (await currentDraft(request)).id
@@ -169,8 +182,43 @@ describe('notification draft session', () => {
     await expect(loadDraft(request)).rejects.toThrow('reference')
   })
 
-  test('cannot save without a journey session', async () => {
+  test('rejects a changed reference from a legacy draft with no Start history', async () => {
+    request.yar.set('notificationDraft', {
+      ...saved(journeyId),
+      reference: 'GBN-FIS-26-LEGACY',
+      saved: true
+    })
+    notificationsClient.find.mockResolvedValue(saved(journeyId))
+
+    await expect(loadDraft(request)).rejects.toThrow(
+      'Draft reference has unexpectedly changed'
+    )
+    expect(notificationsClient.find).toHaveBeenCalledExactlyOnceWith(
+      request,
+      journeyId
+    )
+  })
+
+  test('rejects an update response with a changed draft reference', async () => {
+    await beginJourney()
+    const existing = saved(journeyId)
+    notificationsClient.find.mockResolvedValue(existing)
+    notificationsClient.update.mockResolvedValue({
+      ...existing,
+      reference: 'GBN-FIS-26-OTHER',
+      transportMethod: 'road-vehicle'
+    })
+
+    await expect(saveDraft(request, 'road-vehicle')).rejects.toThrow(
+      'Draft reference has unexpectedly changed during save'
+    )
+    expect(await loadDraft(request)).toEqual(existing)
+  })
+
+  test('cannot load or save without a journey session', async () => {
+    await expect(loadDraft(request)).rejects.toThrow('No active')
     await expect(saveDraft(request, 'air-freight')).rejects.toThrow('No active')
+    expect(notificationsClient.find).not.toHaveBeenCalled()
     expect(notificationsClient.create).not.toHaveBeenCalled()
   })
 
