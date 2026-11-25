@@ -26,13 +26,13 @@ Logging and tracing settings are described in [Logging and observability](loggin
 
 ## Environment mode flags
 
-| Config key      | Derived from                 | Purpose                                                                    |
-| --------------- | ---------------------------- | -------------------------------------------------------------------------- |
-| `isProduction`  | `NODE_ENV === 'production'`  | Indicates production environment; controls error handling in some services |
-| `isDevelopment` | `NODE_ENV === 'development'` | Indicates development environment.                                         |
-| `isTest`        | `NODE_ENV === 'test'`        | Indicates test environment.                                                |
+| Config key      | Derived from                 | Purpose                              |
+| --------------- | ---------------------------- | ------------------------------------ |
+| `isProduction`  | `NODE_ENV === 'production'`  | Enables production runtime defaults. |
+| `isDevelopment` | `NODE_ENV === 'development'` | Indicates development environment.   |
+| `isTest`        | `NODE_ENV === 'test'`        | Indicates test environment.          |
 
-These flags are computed from `NODE_ENV` at startup and determine service behavior such as caching, logging format, and error handling. See [Reference data](reference-data.md) for how `isProduction` affects commodity data fallback behavior.
+These flags are computed from `NODE_ENV` at startup and determine service behavior such as caching and logging format. Commodity fallback uses the CDP deployment environment (`ENVIRONMENT`), not `NODE_ENV`.
 
 ## Reference data
 
@@ -41,7 +41,7 @@ These flags are computed from `NODE_ENV` at startup and determine service behavi
 | `REFERENCE_DATA_API_URL` | Empty string | Base URL of the commodity reference data API.               |
 | `COMMODITIES_PATH`       | Empty string | Path on the reference data API to the commodities endpoint. |
 
-Both must be set to load commodity data from the API. If either is empty, the service fails at request time. See [Reference data](reference-data.md) for loading behavior and production vs. development fallback logic.
+Both must be set to load commodity data from the API. If either is empty, the service uses seeded data only when `ENVIRONMENT` is explicitly set to an approved value; otherwise the load fails at request time. See [Reference data](reference-data.md) for the allowlist.
 
 ## Test user sign-in
 
