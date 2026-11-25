@@ -63,7 +63,7 @@ describe('#homeController', () => {
     const $ = cheerio.load(result)
     const banner = $('.govuk-phase-banner')
 
-    expect(banner.find('.govuk-tag').text().trim()).toBe('Alpha')
+    expect(banner.find('.govuk-tag').text().trim()).toBe('Beta')
     expect(banner.find('.govuk-phase-banner__text').text().trim()).toBe(
       'This is a new service – your feedback will help us improve it.'
     )

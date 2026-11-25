@@ -9,7 +9,7 @@ describe('commodity reference data', () => {
     ;({ getCommodities } = await import('./commodities.js'))
     config.set('referenceDataApiUrl', 'https://reference.example')
     config.set('commoditiesPath', '/commodities')
-    config.set('isDevelopment', false)
+    config.set('isProduction', false)
     logger = { warn: vi.fn() }
   })
 
@@ -34,6 +34,7 @@ describe('commodity reference data', () => {
   })
 
   test('rejects invalid species identities and retries after a failed load', async () => {
+    config.set('isProduction', true)
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(
@@ -61,7 +62,7 @@ describe('commodity reference data', () => {
   })
 
   test('in development an invalid response falls back to the fixture and is cached', async () => {
-    config.set('isDevelopment', true)
+    config.set('isProduction', false)
     const fetch = vi.fn().mockResolvedValue(Response.json({ invalid: true }))
     vi.stubGlobal('fetch', fetch)
 
@@ -74,6 +75,7 @@ describe('commodity reference data', () => {
   })
 
   test('rejects indistinguishable species names in the same commodity', async () => {
+    config.set('isProduction', true)
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -95,6 +97,7 @@ describe('commodity reference data', () => {
   })
 
   test('outside development missing configuration does not use mock data', async () => {
+    config.set('isProduction', true)
     config.set('referenceDataApiUrl', '')
     vi.stubGlobal('fetch', vi.fn())
     await expect(getCommodities(logger)).rejects.toThrow(
