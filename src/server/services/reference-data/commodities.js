@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+
 import { config } from '#/config/config.js'
 
 let cached
@@ -70,9 +72,9 @@ async function loadCommodities(logger) {
       throw error
     }
     logger.warn({ err: error }, 'Using development commodity reference data')
-    const { default: fixture } = await import('./commodities.json', {
-      with: { type: 'json' }
-    })
+    const fixture = JSON.parse(
+      await readFile(new URL('./commodities.json', import.meta.url), 'utf8')
+    )
     return validateCommodities(fixture)
   }
 }

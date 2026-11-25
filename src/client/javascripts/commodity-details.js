@@ -330,8 +330,9 @@ function highlightSpeciesOption(speciesInput, speciesOptionsContainer, index) {
 function getArrowNavigationIndex(event, currentActiveIndex, itemsLength) {
   if (event.key === 'Home') return 0
   if (event.key === 'End') return itemsLength - 1
-  if (event.key === 'ArrowDown')
+  if (event.key === 'ArrowDown') {
     return Math.min(currentActiveIndex + 1, itemsLength - 1)
+  }
   return currentActiveIndex < 0
     ? itemsLength - 1
     : Math.max(currentActiveIndex - 1, 0)
