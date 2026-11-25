@@ -26,7 +26,13 @@ export const transportDetails = {
               payload: transportDetailsSchema,
               async failAction(request, h) {
                 const draft = await currentDraft(request)
-                if (draft && draft.id !== request.payload?.journeyId) {
+                if (!draft) {
+                  return h
+                    .redirect('/notification/guidance')
+                    .code(statusCodes.seeOther)
+                    .takeover()
+                }
+                if (draft.id !== request.payload?.journeyId) {
                   return h.redirect(path).code(statusCodes.seeOther).takeover()
                 }
                 return h
