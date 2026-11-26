@@ -66,6 +66,11 @@ export const config = convict({
     format: String,
     default: 'trade-imports-fish-importer-fe'
   },
+  insServiceName: {
+    doc: 'Import notification service display name',
+    format: String,
+    default: 'Import notification service'
+  },
   cdpEnvironment: {
     doc: 'The CDP environment the app is running in, injected by the platform',
     format: cdpEnvironments,
@@ -77,6 +82,18 @@ export const config = convict({
     format: 'url',
     default: defaultNotificationApiUrl(),
     env: 'NOTIFICATION_API_URL'
+  },
+  referenceDataApiUrl: {
+    doc: 'Base URL for the commodity reference data API',
+    format: String,
+    default: '',
+    env: 'REFERENCE_DATA_API_URL'
+  },
+  commoditiesPath: {
+    doc: 'Path for the commodity reference data API',
+    format: String,
+    default: '',
+    env: 'COMMODITIES_PATH'
   },
   root: {
     doc: 'Project root',

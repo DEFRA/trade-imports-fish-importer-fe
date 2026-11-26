@@ -31,6 +31,7 @@ export function context(request) {
   return {
     assetPath: `${assetPath}/assets`,
     serviceName: config.get('serviceName'),
+    insServiceName: config.get('insServiceName'),
     serviceUrl: '/',
     cookieName: config.get('cookieConsent.name'),
     googleTagManagerKey,

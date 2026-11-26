@@ -1,8 +1,8 @@
 # Notification journey
 
-The [router plugin](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/plugins/router.js) registers the guidance, transport details, consignment details and next-step pages. Their code lives under [`src/server/routes/notification`](https://github.com/DEFRA/trade-imports-fish-importer-fe/tree/main/src/server/routes/notification).
+The [router plugin](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/plugins/router.js) registers the guidance, transport details, consignment details, commodity details and next-step pages. Their code lives under [`src/server/routes/notification`](https://github.com/DEFRA/trade-imports-fish-importer-fe/tree/main/src/server/routes/notification).
 
-The forward journey is guidance -> transport details -> consignment details, followed by a redirect to `/notification/commodity-details`. That route is not yet registered and returns 404 until the commodity details page is integrated. The temporary `/notification/next-step` placeholder remains available directly with a Back link to consignment details, but is no longer the onward destination. Back links on the implemented journey pages follow the reverse order, with guidance returning to the home page.
+The forward journey is guidance -> transport details -> consignment details -> commodity details. Back links on the implemented journey pages follow the reverse order, with guidance returning to the home page. The temporary `/notification/next-step` placeholder remains available directly with a Back link to consignment details.
 
 ## Guidance page
 
@@ -81,11 +81,11 @@ The draft service translates the validated browser selection when constructing a
 
 [`client.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/client.js) calls the backend at `NOTIFICATION_API_URL`, which defaults to `http://localhost:8085` locally and to `https://trade-imports-fish-be.{ENVIRONMENT}.cdp-int.defra.cloud` in CDP environments; see [Configuration](configuration.md).
 
-| Operation | Request                     | Notes                                                                         |
-| --------- | --------------------------- | ----------------------------------------------------------------------------- |
-| `find`    | `GET /notifications/{id}`   | A 404 returns `null`; other non-200 statuses throw.                           |
-| `create`  | `POST /notifications`       | Sends an `Idempotency-Key` header equal to the draft ID; 200 or 201 accepted. |
-| `update`  | `PATCH /notifications/{id}` | 200 accepted; transport and consignment details can be patched independently. |
+| Operation | Request                     | Notes                                                                           |
+| --------- | --------------------------- | ------------------------------------------------------------------------------- |
+| `find`    | `GET /notifications/{id}`   | A 404 returns `null`; other non-200 statuses throw.                             |
+| `create`  | `POST /notifications`       | Sends an `Idempotency-Key` header equal to the draft ID; 200 or 201 accepted.   |
+| `update`  | `PATCH /notifications/{id}` | 200 accepted; transport, consignment and commodity details are sent separately. |
 
 Each write sends `Content-Type: application/json` with only the signed-in organisation and the notification section being changed. A transport patch is:
 
@@ -154,11 +154,41 @@ Successful responses include the following required envelope. The optional `arri
 - Redirects are not followed, and requests time out after 10 seconds.
 - Joi requires `id` (UUID), `reference` (pattern `GBN-FIS-NN-XXXXX`), `status` of `DRAFT`, `organisationId`, ISO `createdAt` and `updatedAt`, and nested `notification.transport.mode` in the canonical set. `notification.arrival` is optional; when present its port code, date, time and `expectedArrivalAt` are validated. Additional arrival fields such as `borderControlPost` are accepted and preserved. Legacy flat responses are not an alternative contract.
 - Optional `countryOfExport`, `exportRegion` and `ched` are validated when present. The CHED reference can be absent or an older string format on read, so users can correct it; malformed response structures are rejected.
-- The returned `id` must match the request. For writes, the organisation and every submitted notification field must match the response in the same canonical form as the request. For export details the client also checks the expected derived region and, for an EU save, that `ched` is absent.
+- The returned `id` must match the request. For writes, the organisation and submitted notification fields must match the response. For export details the client also checks the expected derived region and, for an EU save, that `ched` is absent. For commodities, the client matches by commodity and species code rather than list order and checks weights and names against the values it sent.
 - Validation preserves additional response sections and metadata, including within `notification` and `transport`. It checks the required frontend subset, not the complete backend schema, and does not reject or strip sections simply because the frontend cannot edit them.
+
+## Commodity details page
+
+### Loading the form
+
+`GET /notification/commodity-details` loads [commodity reference data](reference-data.md) before looking up the draft. It returns an HTTP 503 error page if the reference data cannot be loaded. If the draft lookup returns no draft, the handler redirects (303) to `/notification/transport-details` instead of displaying the form. This covers both a fresh journey and a journey ID that has not been saved. Otherwise, the handler renders the form with the reference data and any saved commodity rows.
+
+### Validating and saving selections
+
+The [commodity details script](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/client/javascripts/commodity-details.js) sends the committed rows grouped by commodity as a JSON list in the `commodities` form field. The [POST controller](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/commodity-details/controller.js) checks the structure, duplicate codes and weights before loading reference data to check membership:
+
+- The list must contain at least one commodity. Each commodity requires a `commodityCode`, a `totalNetWeightKg` and at least one species; `description` is optional.
+- Each species requires a `speciesCode`, a `commonName` and a `netWeightKg`; `scientificName` is optional.
+- Weights must be finite and greater than zero. The sum of the species weights must equal the commodity's `totalNetWeightKg`.
+- Each commodity code must be unique in the list and present in the server reference data. Each species code must be unique within its commodity and present in that commodity's species list. The server trims surrounding whitespace and compares codes without regard to case for both lookup and duplicate detection.
+
+Before saving, the handler replaces the browser labels with the reference data's commodity `name` (saved as `description`) and the species `commonName` and `scientificName`. If the reference data has no scientific name, the handler omits it. The saved codes come from the reference data's commodity `code` and species `faoCode`. The validated weights are unchanged.
+
+The [draft service](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/draft-session.js) sends these values as `notification.commodities` in a PATCH to an existing draft. The [API client](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/client.js) checks that the returned list matches what it sent before the handler reports success.
+
+| HTTP status | JSON response and meaning                                                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 200         | `{"success":true}`: the save was confirmed.                                                                                                       |
+| 400         | `{"message":"Check the commodity details and try again."}`: validation failed and the handler did not attempt to save.                            |
+| 409         | A `message` describing the draft conflict.                                                                                                        |
+| 500         | `{"message":"We could not confirm that your commodity details were saved. Try again later."}`: the handler could not attempt or confirm the save. |
+
+If reference data is unavailable during POST, the handler returns 500 **without** attempting to save. Other 500 responses, such as a mismatch in the returned commodity list, do not establish whether the backend saved the changes.
+
+The [controller tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/commodity-details/controller.test.js) check membership, canonical values and save errors. The [route tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/commodity-details/index.test.js) check redirects and saves through `server.inject()` with the notification API client mocked.
 
 ## Validation boundaries and release dependency
 
 The existing [API-client tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/client.test.js) mock fetch. [Draft-session tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/notifications/draft-session.test.js) mock the API client, while the [transport-route tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/transport-details/controller.test.js) and [consignment-route tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/consignment-details/controller.test.js) exercise the real frontend through `server.inject()` with that client mocked. The [arrival-validation tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/consignment-details/validation.test.js) cover form validation and API formatting; [transport-model tests](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/transport-details/model.test.js) exercise transport form presentation. These tests cover the frontend contract and recovery safeguards; they do not prove compatibility with a running backend or backend timestamp refresh behaviour. Real frontend-backend checks must be reported separately.
 
-This frontend requires the matching backend release implementing nested canonical transport creation, transport, arrival and export-details PATCH, and GET as described above. It has no legacy API compatibility path. See [Deployment](deployment.md#notification-api-release-dependency) for the release dependency; coordination remains a separate team decision.
+This frontend requires a backend that supports nested canonical transport creation, PATCH for transport, consignment and commodity details, and GET as described above. It has no legacy API compatibility path. See [Deployment](deployment.md#notification-api-release-dependency) for the release dependency; coordination remains a separate team decision.

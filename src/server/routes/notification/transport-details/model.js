@@ -10,7 +10,8 @@ export const transportDetailsSchema = Joi.object({
     .required()
 })
 
-export function transportDetailsModel(selected, invalid = false) {
+export function transportDetailsModel(selected, invalid = false, saveError) {
+  const errorMessage = saveError || (invalid ? selectionError : null)
   const radios = {
     idPrefix: 'transportMethod',
     name: 'transportMethod',
@@ -25,16 +26,16 @@ export function transportDetailsModel(selected, invalid = false) {
       checked: method.value === selected
     }))
   }
-  if (invalid) {
-    radios.errorMessage = { text: selectionError }
+  if (errorMessage) {
+    radios.errorMessage = { text: errorMessage }
   }
   return {
-    pageTitle: invalid ? 'Error: Transport details' : 'Transport details',
+    pageTitle: errorMessage ? 'Error: Transport details' : 'Transport details',
     radios,
-    errorSummary: invalid
+    errorSummary: errorMessage
       ? {
           titleText: 'There is a problem',
-          errorList: [{ text: selectionError, href: '#transportMethod' }]
+          errorList: [{ text: errorMessage, href: '#transportMethod' }]
         }
       : null
   }

@@ -22,11 +22,18 @@ const auth = {
 }
 
 function notification(id, mode = 'AIR_FREIGHT') {
+  const transportMethodMap = {
+    VESSEL: 'ship-or-vessel',
+    AIR_FREIGHT: 'air-freight',
+    ROAD_VEHICLE: 'road-vehicle'
+  }
   return {
     id,
     reference: 'GBN-FIS-26-AXN04',
     organisationId,
-    notification: { transport: { mode } }
+    notification: { transport: { mode } },
+    transportMethod: transportMethodMap[mode],
+    commodities: null
   }
 }
 
@@ -290,10 +297,10 @@ describe('transport details routes', () => {
     notificationsClient.find.mockResolvedValue(notification(id, 'ROAD_VEHICLE'))
     await submit(journey, 'road-vehicle')
     expect(notificationsClient.create).toHaveBeenCalledTimes(1)
-    expect(notificationsClient.update).toHaveBeenCalledTimes(2)
+    expect(notificationsClient.update).toHaveBeenCalledTimes(1)
     expect(
       notificationsClient.update.mock.calls.map((call) => call[1])
-    ).toEqual([id, id])
+    ).toEqual([id])
   })
 
   test('backend failures do not redirect, and retry recovers an already committed draft', async () => {
@@ -323,6 +330,22 @@ describe('transport details routes', () => {
     expect(failedUpdate.statusCode).toBe(500)
     expect(failedUpdate.headers.location).toBeUndefined()
     expect(notificationsClient.create).toHaveBeenCalledTimes(1)
+  })
+
+  test('shows an explicit error and retains the selection when a save cannot be verified', async () => {
+    const journey = await visit()
+    notificationsClient.create.mockRejectedValueOnce(
+      new Error('Notification API response does not match the saved details')
+    )
+
+    const response = await submit(journey, 'air-freight')
+    const $ = load(response.payload)
+    expect(response.statusCode).toBe(500)
+    expect(response.headers.location).toBeUndefined()
+    expect($('.govuk-error-summary').text()).toContain(
+      'We could not confirm that your transport details were saved'
+    )
+    expect($('input:checked').val()).toBe('air-freight')
   })
 
   test('separate browser sessions do not share draft identities', async () => {

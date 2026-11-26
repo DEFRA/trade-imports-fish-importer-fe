@@ -18,11 +18,30 @@
 | `NOTIFICATION_API_URL`   | Derived from `ENVIRONMENT`              | Base URL of the fish notification backend; see [Notification journey](notification-journey.md).                                       |
 | `GOOGLE_TAG_MANAGER_KEY` | Empty string                            | Tag Manager container ID; see [Cookie consent](cookie-consent.md).                                                                    |
 
-The service name is fixed in configuration as `trade-imports-fish-importer-fe`. `NOTIFICATION_API_URL` defaults to `http://localhost:8085` when `ENVIRONMENT` is `local`, and to `https://trade-imports-fish-be.{ENVIRONMENT}.cdp-int.defra.cloud` in CDP environments; set it explicitly to override. An `ENVIRONMENT` value outside the listed set fails config validation at startup.
+The service name is fixed in configuration as `trade-imports-fish-importer-fe`. The service navigation display name, `insServiceName`, defaults to `Import notification service`. `NOTIFICATION_API_URL` defaults to `http://localhost:8085` when `ENVIRONMENT` is `local`, and to `https://trade-imports-fish-be.{ENVIRONMENT}.cdp-int.defra.cloud` in CDP environments; set it explicitly to override. An `ENVIRONMENT` value outside the listed set fails config validation at startup.
 
 Config exposes `HTTP_PROXY`; the application code does not itself configure an outbound HTTP client with this value.
 
 Logging and tracing settings are described in [Logging and observability](logging-and-observability.md).
+
+## Environment mode flags
+
+| Config key      | Derived from                 | Purpose                              |
+| --------------- | ---------------------------- | ------------------------------------ |
+| `isProduction`  | `NODE_ENV === 'production'`  | Enables production runtime defaults. |
+| `isDevelopment` | `NODE_ENV === 'development'` | Indicates development environment.   |
+| `isTest`        | `NODE_ENV === 'test'`        | Indicates test environment.          |
+
+These flags are computed from `NODE_ENV` at startup and determine service behavior such as caching and logging format. Commodity fallback uses the CDP deployment environment (`ENVIRONMENT`), not `NODE_ENV`.
+
+## Reference data
+
+| Environment variable     | Default      | Purpose                                                     |
+| ------------------------ | ------------ | ----------------------------------------------------------- |
+| `REFERENCE_DATA_API_URL` | Empty string | Base URL of the commodity reference data API.               |
+| `COMMODITIES_PATH`       | Empty string | Path on the reference data API to the commodities endpoint. |
+
+Both must be set to load commodity data from the API. If either is empty, the service uses seeded data only when `ENVIRONMENT` is explicitly set to an approved value; otherwise the load fails at request time. See [Reference data](reference-data.md) for the allowlist.
 
 ## Test user sign-in
 

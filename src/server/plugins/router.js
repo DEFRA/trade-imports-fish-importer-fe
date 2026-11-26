@@ -11,6 +11,7 @@ import { cookies } from '../routes/cookies/controller.js'
 import { serveStaticFiles } from './serve-static-files.js'
 import { config } from '#/config/config.js'
 import { transportDetails } from '../routes/notification/transport-details/index.js'
+import { commodityDetails } from '../routes/notification/commodity-details/index.js'
 
 export const router = {
   plugin: {
@@ -29,7 +30,8 @@ export const router = {
         guidance,
         transportDetails,
         consignmentDetails,
-        nextStep
+        nextStep,
+        commodityDetails
       ])
 
       if (config.get('auth.testUserSignInEnabled')) {

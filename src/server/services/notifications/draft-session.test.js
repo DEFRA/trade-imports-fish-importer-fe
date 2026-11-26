@@ -3,6 +3,7 @@ import {
   loadDraft,
   loadSavedDraft,
   saveConsignmentDetails,
+  saveCommodities,
   saveDraft
 } from './draft-session.js'
 import { notificationsClient } from './client.js'
@@ -296,6 +297,46 @@ describe('notification draft session', () => {
   test('cannot save without a journey session', async () => {
     await expect(saveDraft(request, 'air-freight')).rejects.toThrow('No active')
     expect(notificationsClient.create).not.toHaveBeenCalled()
+  })
+
+  test('patches commodities only onto the existing notification draft', async () => {
+    await loadDraft(request)
+    const id = currentDraft(request).id
+    await saveDraft(request, 'air-freight')
+    const commodities = [
+      {
+        commodityCode: '03021400',
+        species: [
+          {
+            speciesCode: 'SAL',
+            commonName: 'Atlantic salmon',
+            netWeightKg: 12
+          }
+        ],
+        totalNetWeightKg: 12
+      }
+    ]
+    notificationsClient.find.mockResolvedValue(saved(id))
+    notificationsClient.update.mockResolvedValue({
+      ...saved(id),
+      notification: { commodities }
+    })
+
+    await saveCommodities(request, commodities)
+
+    expect(notificationsClient.update).toHaveBeenLastCalledWith(request, id, {
+      organisationId,
+      notification: { commodities }
+    })
+  })
+
+  test('does not patch commodities before the notification draft exists', async () => {
+    await loadDraft(request)
+
+    await expect(saveCommodities(request, [])).rejects.toThrow(
+      'must be saved before commodities'
+    )
+    expect(notificationsClient.update).not.toHaveBeenCalled()
   })
 
   test('saves under the signed-in organisation', async () => {

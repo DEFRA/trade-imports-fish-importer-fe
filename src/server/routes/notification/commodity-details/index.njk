@@ -1,0 +1,73 @@
+{% extends 'layouts/page.njk' %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+
+{% block beforeContent %}
+  {{ govukBackLink({ text: "Back", href: "/notification/consignment-details" }) }}
+{% endblock %}
+
+{% block content %}
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+      <span class="govuk-caption-l">Import notification</span>
+      <h1 class="govuk-heading-l">Tell us about the seafood you are importing</h1>
+      <p class="govuk-body">Provide details of the seafood products included in this import notification.</p>
+      <p class="govuk-body">Add each commodity, species and weight that forms part of this consignment.</p>
+      <form method="post" data-commodity-form data-reference="{{ referenceData }}" data-saved="{{ savedCommodities }}">
+        <input type="hidden" name="crumb" value="{{ crumb }}">
+        <input type="hidden" name="commodities" data-commodities>
+        <div data-errors></div>
+        <div data-commodity-summary hidden>
+          <h2 class="govuk-heading-m">Commodities added so far</h2>
+          <table class="govuk-table">
+            <thead class="govuk-table__head"><tr class="govuk-table__row">
+              <th class="govuk-table__header" scope="col">Commodity code</th>
+              <th class="govuk-table__header" scope="col">Species</th>
+              <th class="govuk-table__header" scope="col">Weight (kg)</th>
+              <th class="govuk-table__header" scope="col"><span class="govuk-visually-hidden">Actions</span></th>
+            </tr></thead>
+            <tbody class="govuk-table__body" data-rows></tbody>
+          </table>
+        </div>
+        <div class="govuk-grid-row" data-commodity-fields-row>
+          <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+              <label class="govuk-label govuk-label--m" for="commodityCode">Commodity code</label>
+              <div class="app-commodity-dropdown">
+                <div class="app-commodity-dropdown__input">
+                  <input class="govuk-input" id="commodityCode" name="commodityCode" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="commodity-options">
+                  <button class="app-commodity-dropdown__toggle" type="button" tabindex="-1" aria-label="Show or hide commodity options" aria-controls="commodity-options"></button>
+                </div>
+                <div class="app-commodity-dropdown__list" id="commodity-options" role="listbox" aria-label="Commodity codes" hidden></div>
+              </div>
+            </div>
+          </div>
+          <div class="govuk-grid-column-one-quarter app-commodity-species-column">
+            <div class="govuk-form-group">
+              <label class="govuk-label govuk-label--m" id="species-label" for="species">Species</label>
+              <div class="app-commodity-dropdown">
+                <button class="govuk-select govuk-!-width-full app-commodity-species" id="species" name="species" type="button" value="" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="species-options" aria-labelledby="species-label species-value"><span id="species-value"></span></button>
+                <div class="app-commodity-dropdown__list app-commodity-dropdown__list--species" id="species-options" role="listbox" aria-label="Species" hidden></div>
+              </div>
+            </div>
+          </div>
+          <div class="govuk-grid-column-one-quarter app-commodity-weight-column">
+            <div class="govuk-form-group">
+              <label class="govuk-label govuk-label--m" for="weight">Weight<span class="govuk-visually-hidden"> in kilograms</span></label>
+              <div class="govuk-input__wrapper">
+                <input class="govuk-input govuk-input--width-10" id="weight" name="weight" type="text" inputmode="decimal">
+                <div class="govuk-input__suffix" aria-hidden="true">kg</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {{ govukButton({ text: "Add commodity", type: "button", classes: "govuk-button--secondary", attributes: { "data-add-commodity": "" } }) }}
+        <h2 class="govuk-heading-m">Before you continue</h2>
+        <p class="govuk-body">You must include all commodities and species covered by this notification.</p>
+        <p class="govuk-body">You can add, remove or update these details later before submitting your notification.</p>
+        {{ govukButton({ text: "Save and continue", id: "save-commodity" }) }}
+      </form>
+    </div>
+  </div>
+{% endblock %}

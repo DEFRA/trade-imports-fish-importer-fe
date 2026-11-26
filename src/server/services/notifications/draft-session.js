@@ -85,6 +85,9 @@ export async function saveDraft(request, transportMethod) {
   const existing = await findDraft(request, draft)
   if (existing) {
     remember(request, existing)
+    if (existing.transportMethod === transportMethod) {
+      return existing
+    }
   }
   const payload = {
     organisationId: organisationOf(request),
@@ -113,6 +116,28 @@ export async function saveConsignmentDetails(request, details) {
   const notification = await notificationsClient.update(request, draft.id, {
     organisationId: organisationOf(request),
     notification: details
+  })
+  if (notification.reference !== existing.reference) {
+    throw new Error('Draft reference has unexpectedly changed during save')
+  }
+  remember(request, notification)
+  return notification
+}
+
+export async function saveCommodities(request, details) {
+  const draft = currentDraft(request)
+  if (!draft) {
+    throw new Error('No active notification journey')
+  }
+  const existing = await findDraft(request, draft)
+  if (!existing) {
+    throw new Error('The notification draft must be saved before commodities')
+  }
+
+  remember(request, existing)
+  const notification = await notificationsClient.update(request, draft.id, {
+    organisationId: organisationOf(request),
+    notification: { commodities: details }
   })
   if (notification.reference !== existing.reference) {
     throw new Error('Draft reference has unexpectedly changed during save')
