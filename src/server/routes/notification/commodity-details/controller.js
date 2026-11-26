@@ -91,10 +91,16 @@ export const getCommodityDetailsController = {
         .code(statusCodes.serviceUnavailable)
     }
     const draft = await loadDraft(request)
+    if (!draft) {
+      return h
+        .redirect('/notification/transport-details')
+        .code(statusCodes.seeOther)
+    }
+
     return h.view('notification/commodity-details/index', {
       pageTitle: 'Tell us about the seafood you are importing',
       referenceData: JSON.stringify(commodities),
-      savedCommodities: JSON.stringify(draft?.commodities ?? [])
+      savedCommodities: JSON.stringify(draft.commodities ?? [])
     })
   }
 }

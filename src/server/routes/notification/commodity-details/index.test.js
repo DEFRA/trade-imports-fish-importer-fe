@@ -20,8 +20,34 @@ const auth = {
   }
 }
 
+function cookieHeader(...responses) {
+  const cookies = new Map()
+  for (const response of responses) {
+    for (const item of response.headers['set-cookie'] ?? []) {
+      const cookie = item.split(';')[0]
+      cookies.set(cookie.split('=')[0], cookie)
+    }
+  }
+  return [...cookies.values()].join('; ')
+}
+
 describe('commodity details routes', () => {
   let server
+
+  async function visitCommodityDetailsWithJourney() {
+    const journey = await server.inject({
+      method: 'GET',
+      url: '/notification/transport-details',
+      auth
+    })
+    const response = await server.inject({
+      method: 'GET',
+      url: '/notification/commodity-details',
+      auth,
+      headers: { cookie: cookieHeader(journey) }
+    })
+    return { response, cookie: cookieHeader(journey, response) }
+  }
 
   beforeAll(async () => {
     config.set('referenceDataApiUrl', 'https://reference.example')
@@ -87,12 +113,30 @@ describe('commodity details routes', () => {
     expect(routes.map((route) => route.method).sort()).toEqual(['get', 'post'])
   })
 
-  test('shows the commodity form with the transport back link', async () => {
+  test('redirects a fresh journey to transport details without rendering the form', async () => {
     const response = await server.inject({
       method: 'GET',
       url: '/notification/commodity-details',
       auth
     })
+
+    expect(response.statusCode).toBe(303)
+    expect(response.headers.location).toBe('/notification/transport-details')
+    expect(load(response.payload)('[data-commodity-form]')).toHaveLength(0)
+  })
+
+  test('redirects to transport details when the journey ID has no saved draft', async () => {
+    notificationsClient.find.mockResolvedValueOnce(null)
+
+    const { response } = await visitCommodityDetailsWithJourney()
+
+    expect(response.statusCode).toBe(303)
+    expect(response.headers.location).toBe('/notification/transport-details')
+    expect(notificationsClient.find).toHaveBeenCalledOnce()
+  })
+
+  test('shows the commodity form with the transport back link', async () => {
+    const { response } = await visitCommodityDetailsWithJourney()
     const $ = load(response.payload)
     expect(response.statusCode).toBe(200)
     expect($('h1').text()).toContain('seafood')
@@ -104,11 +148,7 @@ describe('commodity details routes', () => {
   })
 
   test('provides the commodity, species and weight controls', async () => {
-    const response = await server.inject({
-      method: 'GET',
-      url: '/notification/commodity-details',
-      auth
-    })
+    const { response } = await visitCommodityDetailsWithJourney()
     const $ = load(response.payload)
     expect($('label[for="commodityCode"]').text()).toContain('Commodity code')
     expect($('label[for="species"]').text()).toContain('Species')
@@ -118,11 +158,7 @@ describe('commodity details routes', () => {
   })
 
   test('provides labelled comboboxes and associated option lists', async () => {
-    const response = await server.inject({
-      method: 'GET',
-      url: '/notification/commodity-details',
-      auth
-    })
+    const { response } = await visitCommodityDetailsWithJourney()
     const $ = load(response.payload)
     for (const id of ['commodityCode', 'species']) {
       const control = $(`#${id}`)
@@ -139,25 +175,14 @@ describe('commodity details routes', () => {
   })
 
   test('hides the empty commodity summary until client-side rows are rendered', async () => {
-    const response = await server.inject({
-      method: 'GET',
-      url: '/notification/commodity-details',
-      auth
-    })
+    const { response } = await visitCommodityDetailsWithJourney()
     const $ = load(response.payload)
     expect($('[data-commodity-summary]').attr('hidden')).toBeDefined()
     expect($('[data-commodity-summary] [data-rows] tr')).toHaveLength(0)
   })
 
   test('patches committed commodities and returns success', async () => {
-    const visit = await server.inject({
-      method: 'GET',
-      url: '/notification/commodity-details',
-      auth
-    })
-    const cookie = (visit.headers['set-cookie'] ?? [])
-      .map((item) => item.split(';')[0])
-      .join('; ')
+    const { response: visit, cookie } = await visitCommodityDetailsWithJourney()
     const crumb = load(visit.payload)(
       '[data-commodity-form] input[name="crumb"]'
     ).val()
@@ -195,14 +220,7 @@ describe('commodity details routes', () => {
   })
 
   test('returns a conflict response without redirecting when the draft changed', async () => {
-    const visit = await server.inject({
-      method: 'GET',
-      url: '/notification/commodity-details',
-      auth
-    })
-    const cookie = (visit.headers['set-cookie'] ?? [])
-      .map((item) => item.split(';')[0])
-      .join('; ')
+    const { response: visit, cookie } = await visitCommodityDetailsWithJourney()
     const crumb = load(visit.payload)(
       '[data-commodity-form] input[name="crumb"]'
     ).val()

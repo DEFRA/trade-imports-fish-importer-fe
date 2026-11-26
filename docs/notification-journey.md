@@ -164,7 +164,7 @@ Successful responses include the following required envelope. The optional `arri
 | GET    | `/notification/commodity-details` | Loads reference commodity data and renders the commodity selection interface with saved commodity rows. |
 | POST   | `/notification/commodity-details` | Validates and saves committed commodities; returns JSON with status 200 on success or an error message. |
 
-The commodity details page requires loaded reference data from [`getCommodities()`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/reference-data/commodities.js). The page renders with the reference data, pre-filled from any previously saved commodities in the session draft. The client-side script [`commodity-details.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/client/javascripts/commodity-details.js) handles the interactive dropdown selections and form submission.
+The commodity details page requires loaded reference data from [`getCommodities()`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/reference-data/commodities.js). If no saved draft is found for the journey, the page redirects (303) to `/notification/transport-details` instead of displaying the form. Otherwise, the page renders with the reference data and any previously saved commodities. The client-side script [`commodity-details.js`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/client/javascripts/commodity-details.js) handles the interactive dropdown selections and form submission.
 
 Reference data loading, validation, and fallback behavior are described in [Reference data](reference-data.md).
 
