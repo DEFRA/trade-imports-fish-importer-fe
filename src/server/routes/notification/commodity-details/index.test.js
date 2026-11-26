@@ -152,7 +152,14 @@ describe('commodity details routes', () => {
     const $ = load(response.payload)
     expect($('label[for="commodityCode"]').text()).toContain('Commodity code')
     expect($('label[for="species"]').text()).toContain('Species')
-    expect($('label[for="weight"]').text()).toContain('Weight')
+    const weightLabel = $('label[for="weight"]')
+    expect(weightLabel.text()).toBe('Weight in kilograms')
+    expect(weightLabel.find('.govuk-visually-hidden').text()).toBe(
+      ' in kilograms'
+    )
+    expect($('#weight + .govuk-input__suffix[aria-hidden="true"]').text()).toBe(
+      'kg'
+    )
     expect($('button').text()).toContain('Add commodity')
     expect($('button').text()).toContain('Save and continue')
   })
