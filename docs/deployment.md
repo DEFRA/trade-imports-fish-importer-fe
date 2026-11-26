@@ -12,6 +12,10 @@ The [Publish Hot Fix workflow](https://github.com/DEFRA/trade-imports-fish-impor
 
 Pull requests to `main` run security audit, frontend build, formatting, lint, tests and a Docker image build in the [pull request workflow](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/.github/workflows/check-pull-request.yml).
 
+## Notification API release dependency
+
+The notification journey requires the matching backend release implementing nested canonical transport creation, transport and arrival PATCH, and GET in the [notification API contract](notification-journey.md#notification-api-client). There is no legacy API compatibility path. Include this dependency in the frontend PR description when creating a PR; release coordination is a separate team decision.
+
 ## Local Compose environment
 
 Run the local services with:

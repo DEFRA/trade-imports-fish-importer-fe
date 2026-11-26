@@ -2,14 +2,13 @@ import { load } from 'cheerio'
 import { config } from '#/config/config.js'
 import { createServer } from '#/server/server.js'
 import { notificationsClient } from '#/server/services/notifications/client.js'
+import {
+  cookieHeader,
+  mockNotificationDrafts,
+  receiveCookies
+} from '#/test-helpers/notification-journey.js'
 
-vi.mock('#/server/services/notifications/client.js', () => ({
-  notificationsClient: {
-    find: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn()
-  }
-}))
+vi.mock('#/server/services/notifications/client.js')
 
 const path = '/notification/transport-details'
 const organisationId = 'test-org-north-quay-seafood'
@@ -22,26 +21,18 @@ const auth = {
   }
 }
 
-function notification(id, transportMethod = 'air-freight') {
-  return { id, reference: 'GBN-FIS-26-AXN04', organisationId, transportMethod }
-}
-
-function receiveCookies(jar, response) {
-  for (const cookie of response.headers['set-cookie'] ?? []) {
-    const pair = cookie.split(';')[0]
-    const separator = pair.indexOf('=')
-    jar[pair.slice(0, separator)] = pair.slice(separator + 1)
+function notification(id, mode = 'AIR_FREIGHT') {
+  return {
+    id,
+    reference: 'GBN-FIS-26-AXN04',
+    organisationId,
+    notification: { transport: { mode } }
   }
-}
-
-function cookieHeader(jar) {
-  return Object.entries(jar)
-    .map(([name, value]) => `${name}=${value}`)
-    .join('; ')
 }
 
 describe('transport details routes', () => {
   let server
+  let drafts
 
   async function initializeServer(instance) {
     await instance.initialize()
@@ -61,13 +52,7 @@ describe('transport details routes', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
-    notificationsClient.find.mockResolvedValue(null)
-    notificationsClient.create.mockImplementation(
-      async (_request, id, payload) => notification(id, payload.transportMethod)
-    )
-    notificationsClient.update.mockImplementation(
-      async (_request, id, payload) => notification(id, payload.transportMethod)
-    )
+    drafts = mockNotificationDrafts(notificationsClient)
   })
 
   async function visit() {
@@ -127,7 +112,7 @@ describe('transport details routes', () => {
   })
 
   test('renders screenshot main content with no initial selection or backend draft', async () => {
-    const { response } = await visit()
+    const { response, journeyId } = await visit()
     const $ = load(response.payload)
     expect(response.statusCode).toBe(200)
     expect($('.govuk-caption-l').text()).toBe('Import notification')
@@ -147,30 +132,55 @@ describe('transport details routes', () => {
     )
     expect($('main form button').text().trim()).toBe('Save and continue')
     expect($('.govuk-back-link').attr('href')).toBe('/notification/guidance')
+    expect(notificationsClient.find).toHaveBeenCalledExactlyOnceWith(
+      expect.anything(),
+      journeyId
+    )
     expect(notificationsClient.create).not.toHaveBeenCalled()
   })
 
-  test.each(['ship-or-vessel', 'air-freight', 'road-vehicle'])(
-    'saves %s, then redirects to the intentionally missing next page',
-    async (transportMethod) => {
-      const response = await submit(await visit(), transportMethod)
+  test.each([
+    ['Ship or vessel', 'VESSEL'],
+    ['Air freight', 'AIR_FREIGHT'],
+    ['Road vehicle', 'ROAD_VEHICLE']
+  ])(
+    'submits the %s radio as %s, then redirects to consignment details',
+    async (label, mode) => {
+      const journey = await visit()
+      const $ = load(journey.response.payload)
+      const radio = $(`input[name="transportMethod"][value="${mode}"]`)
+      expect(
+        $(`label[for="${radio.attr('id')}"]`)
+          .text()
+          .trim()
+      ).toBe(label)
+      const response = await submit(journey, radio.val())
       expect(response.statusCode).toBe(303)
       expect(response.headers.location).toBe(
-        '/notification/consignment-arrival-details'
+        '/notification/consignment-details'
       )
       expect(notificationsClient.create).toHaveBeenCalledWith(
         expect.anything(),
         expect.stringMatching(/^[a-f0-9-]{36}$/),
-        { organisationId, transportMethod }
+        { organisationId, notification: { transport: { mode } } }
       )
-      expect(
-        (await server.inject({ url: response.headers.location, auth }))
-          .statusCode
-      ).toBe(404)
+      const destination = await server.inject({
+        url: response.headers.location,
+        auth,
+        headers: { cookie: cookieHeader(journey.jar) }
+      })
+      expect(destination.statusCode).toBe(200)
+      expect(load(destination.payload)('h1').text()).toBe('Consignment details')
     }
   )
 
-  test.each([undefined, '', 'train', ['air-freight', 'road-vehicle']])(
+  test.each([
+    undefined,
+    '',
+    'train',
+    'air-freight',
+    ['AIR_FREIGHT', 'ROAD_VEHICLE']
+  ])(
     'invalid selection %j renders accessible errors without persistence',
     async (transportMethod) => {
       const response = await submit(await visit(), transportMethod)
@@ -190,21 +200,78 @@ describe('transport details routes', () => {
     }
   )
 
-  test('returning selects saved choice, changing and repeating saves update the same draft', async () => {
+  test.each(['VESSEL', 'AIR_FREIGHT', 'ROAD_VEHICLE'])(
+    'preselects the saved %s radio',
+    async (mode) => {
+      const { jar, journeyId } = await visit()
+      drafts.set(journeyId, notification(journeyId, mode))
+      const response = await server.inject({
+        method: 'GET',
+        url: path,
+        auth,
+        headers: { cookie: cookieHeader(jar) }
+      })
+      const $ = load(response.payload)
+      expect(response.statusCode).toBe(200)
+      expect($('input[type="radio"]:checked')).toHaveLength(1)
+      expect($('input[type="radio"]:checked').val()).toBe(mode)
+    }
+  )
+
+  test('retains the selected mode when another submitted field is invalid', async () => {
     const journey = await visit()
-    await submit(journey, 'air-freight')
+    const response = await server.inject({
+      method: 'POST',
+      url: path,
+      auth,
+      headers: { cookie: cookieHeader(journey.jar) },
+      payload: {
+        transportMethod: 'ROAD_VEHICLE',
+        unsupported: 'value',
+        crumb: journey.crumb,
+        journeyId: journey.journeyId
+      }
+    })
+    const $ = load(response.payload)
+    expect(response.statusCode).toBe(400)
+    expect($('input:checked').val()).toBe('ROAD_VEHICLE')
+    expect($('title').text().trim()).toMatch(/^Error: Transport details/)
+    expect($('.govuk-error-summary a').attr('href')).toBe('#transportMethod')
+    expect(notificationsClient.create).not.toHaveBeenCalled()
+    expect(notificationsClient.update).not.toHaveBeenCalled()
+  })
+
+  test('guidance leads through transport to consignment, and returning and resaving use the same draft', async () => {
+    const journey = await visit()
+    const { jar } = journey
+    expect(journey.response.statusCode).toBe(200)
+    const saved = await submit(journey, 'AIR_FREIGHT')
+    expect(saved.statusCode).toBe(303)
+    const consignment = await server.inject({
+      url: saved.headers.location,
+      auth,
+      headers: { cookie: cookieHeader(jar) }
+    })
+    expect(consignment.statusCode).toBe(200)
+    receiveCookies(jar, consignment)
+    const back = load(consignment.payload)('.govuk-back-link').attr('href')
+    expect(back).toBe(path)
     const id = notificationsClient.create.mock.calls[0][1]
-    notificationsClient.find.mockResolvedValue(notification(id))
     const returned = await server.inject({
       method: 'GET',
-      url: path,
+      url: back,
       auth,
       headers: { cookie: cookieHeader(journey.jar) }
     })
-    expect(load(returned.payload)('input:checked').val()).toBe('air-freight')
-    await submit(journey, 'road-vehicle')
-    notificationsClient.find.mockResolvedValue(notification(id, 'road-vehicle'))
-    await submit(journey, 'road-vehicle')
+    expect(returned.statusCode).toBe(200)
+    expect(load(returned.payload)('input:checked').val()).toBe('AIR_FREIGHT')
+    expect(load(returned.payload)('.govuk-back-link').attr('href')).toBe(
+      '/notification/guidance'
+    )
+    receiveCookies(jar, returned)
+    journey.crumb = load(returned.payload)('form input[name="crumb"]').val()
+    await submit(journey, 'ROAD_VEHICLE')
+    await submit(journey, 'ROAD_VEHICLE')
     expect(notificationsClient.create).toHaveBeenCalledTimes(1)
     expect(notificationsClient.update).toHaveBeenCalledTimes(2)
     expect(
@@ -214,11 +281,8 @@ describe('transport details routes', () => {
 
   test('Start now begins a distinct notification after saving transport details', async () => {
     const journey = await visit()
-    await submit(journey, 'air-freight')
+    await submit(journey, 'AIR_FREIGHT')
     const firstId = notificationsClient.create.mock.calls[0][1]
-    notificationsClient.find.mockImplementation(async (_request, id) =>
-      id === firstId ? notification(firstId) : null
-    )
 
     const guidance = await server.inject({
       url: '/notification/guidance',
@@ -252,7 +316,7 @@ describe('transport details routes', () => {
     journey.journeyId = load(transport.payload)(
       'form input[name="journeyId"]'
     ).val()
-    await submit(journey, 'road-vehicle')
+    await submit(journey, 'ROAD_VEHICLE')
     expect(notificationsClient.create).toHaveBeenCalledTimes(2)
     expect(notificationsClient.create.mock.calls[1][1]).not.toBe(firstId)
     expect(notificationsClient.update).not.toHaveBeenCalled()
@@ -290,7 +354,7 @@ describe('transport details routes', () => {
       payload: {
         crumb: journey.crumb,
         journeyId: firstId,
-        transportMethod: 'air-freight'
+        transportMethod: 'AIR_FREIGHT'
       }
     })
     expect(stale.statusCode).toBe(303)
@@ -483,7 +547,10 @@ describe('transport details routes', () => {
     })
     receiveCookies(journey.jar, started)
     releaseFind()
-    await loading
+    const loaded = await loading
+    expect(load(loaded.payload)('form input[name="journeyId"]').val()).toBe(
+      journey.journeyId
+    )
 
     const current = await server.inject({
       url: path,
@@ -509,10 +576,10 @@ describe('transport details routes', () => {
       async (_request, id, payload) => {
         beginCreate()
         await createCanFinish
-        return notification(id, payload.transportMethod)
+        return notification(id, payload.notification.transport.mode)
       }
     )
-    const saving = submit(journey, 'air-freight')
+    const saving = submit(journey, 'AIR_FREIGHT')
     await createStarted
 
     const guidance = await server.inject({
@@ -550,26 +617,53 @@ describe('transport details routes', () => {
 
   test('backend failures do not redirect, and retry recovers an already committed draft', async () => {
     const journey = await visit()
-    notificationsClient.create.mockRejectedValueOnce(
-      new Error('Lost backend response')
-    )
-    const failed = await submit(journey, 'air-freight')
+    const create = notificationsClient.create.getMockImplementation()
+    notificationsClient.create.mockImplementationOnce(async (...args) => {
+      await create(...args)
+      throw new Error('Lost backend response')
+    })
+    const failed = await submit(journey, 'AIR_FREIGHT')
     expect(failed.statusCode).toBe(500)
     expect(failed.headers.location).toBeUndefined()
     const id = notificationsClient.create.mock.calls[0][1]
-    notificationsClient.find.mockResolvedValue(notification(id))
-    expect((await submit(journey, 'road-vehicle')).statusCode).toBe(303)
+    expect((await submit(journey, 'ROAD_VEHICLE')).statusCode).toBe(303)
     expect(notificationsClient.create).toHaveBeenCalledTimes(1)
     expect(notificationsClient.update).toHaveBeenCalledWith(
       expect.anything(),
       id,
-      { organisationId, transportMethod: 'road-vehicle' }
+      {
+        organisationId,
+        notification: { transport: { mode: 'ROAD_VEHICLE' } }
+      }
     )
+    notificationsClient.update.mockRejectedValueOnce(
+      new Error('Backend unavailable')
+    )
+    const failedUpdate = await submit(journey, 'ROAD_VEHICLE')
+    expect(failedUpdate.statusCode).toBe(500)
+    expect(failedUpdate.headers.location).toBeUndefined()
+    expect(notificationsClient.create).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not recreate a draft that disappears between lookup and update', async () => {
+    const journey = await visit()
+    await submit(journey, 'AIR_FREIGHT')
+    const { journeyId } = journey
+    notificationsClient.find.mockResolvedValueOnce(drafts.get(journeyId))
+    drafts.delete(journeyId)
+
+    const response = await submit(journey, 'ROAD_VEHICLE')
+
+    expect(response.statusCode).toBe(500)
+    expect(response.headers.location).toBeUndefined()
+    expect(notificationsClient.update).toHaveBeenCalledTimes(1)
+    expect(notificationsClient.create).toHaveBeenCalledTimes(1)
+    expect(drafts.has(journeyId)).toBe(false)
   })
 
   test('separate browser sessions do not share draft identities', async () => {
-    await submit(await visit(), 'air-freight')
-    await submit(await visit(), 'air-freight')
+    await submit(await visit(), 'AIR_FREIGHT')
+    await submit(await visit(), 'AIR_FREIGHT')
     expect(notificationsClient.create.mock.calls[0][1]).not.toBe(
       notificationsClient.create.mock.calls[1][1]
     )
@@ -582,13 +676,13 @@ describe('transport details routes', () => {
       url: path,
       auth,
       headers: { cookie: cookieHeader(journey.jar) },
-      payload: { transportMethod: 'air-freight' }
+      payload: { transportMethod: 'AIR_FREIGHT' }
     })
     expect(response.statusCode).toBe(403)
     expect(notificationsClient.create).not.toHaveBeenCalled()
   })
 
-  test('valid CSRF without the journey session asks the user to start again', async () => {
+  test('a valid submission without the notification session shows the expired-session response', async () => {
     const journey = await visit()
     const response = await server.inject({
       method: 'POST',
@@ -598,12 +692,16 @@ describe('transport details routes', () => {
       payload: {
         crumb: journey.crumb,
         journeyId: journey.journeyId,
-        transportMethod: 'air-freight'
+        transportMethod: 'AIR_FREIGHT'
       }
     })
     expect(response.statusCode).toBe(400)
-    expect(response.payload).toContain('Your session has expired')
+    expect(response.headers.location).toBeUndefined()
+    expect(response.payload).toContain(
+      'Your session has expired. Return to Transport details and try again.'
+    )
     expect(notificationsClient.create).not.toHaveBeenCalled()
+    expect(notificationsClient.update).not.toHaveBeenCalled()
   })
 
   test('an invalid selection without the journey session redirects to guidance', async () => {

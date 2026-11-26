@@ -1,13 +1,16 @@
 import Joi from 'joi'
 
-import { transportMethods } from '#/server/common/constants/transport-methods.js'
+import {
+  transportModeOptions,
+  transportModes
+} from '#/server/common/constants/transport-methods.js'
 
 const selectionError = 'Select how the consignment is being transported'
 
 export const transportDetailsSchema = Joi.object({
   journeyId: Joi.string().uuid().required(),
   transportMethod: Joi.string()
-    .valid(...transportMethods.map(({ value }) => value))
+    .valid(...transportModes)
     .required()
 })
 
@@ -21,9 +24,9 @@ export function transportDetailsModel(selected, invalid, journeyId) {
         classes: 'govuk-fieldset__legend--m'
       }
     },
-    items: transportMethods.map((method) => ({
-      ...method,
-      checked: method.value === selected
+    items: transportModeOptions.map((option) => ({
+      ...option,
+      checked: option.value === selected
     }))
   }
   if (invalid) {

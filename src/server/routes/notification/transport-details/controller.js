@@ -1,5 +1,4 @@
 import {
-  currentDraft,
   loadDraft,
   saveDraft
 } from '#/server/services/notifications/draft-session.js'
@@ -8,21 +7,22 @@ import { transportDetailsModel } from './model.js'
 
 export const getTransportDetailsController = {
   async handler(request, h) {
-    const draft = await currentDraft(request)
-    if (!draft) {
-      return h.redirect('/notification/guidance').code(statusCodes.seeOther)
-    }
+    const draft = request.app.notificationDraft
     const notification = await loadDraft(request, draft)
     return h.view(
       'notification/transport-details/index',
-      transportDetailsModel(notification?.transportMethod, false, draft.id)
+      transportDetailsModel(
+        notification?.notification.transport.mode,
+        false,
+        draft.id
+      )
     )
   }
 }
 
 export const postTransportDetailsController = {
   async handler(request, h) {
-    const draft = await currentDraft(request)
+    const draft = request.app.notificationDraft
     if (!draft) {
       return h
         .view('error/index', {
@@ -33,14 +33,9 @@ export const postTransportDetailsController = {
         })
         .code(statusCodes.badRequest)
     }
-    if (draft.id !== request.payload.journeyId) {
-      return h
-        .redirect('/notification/transport-details')
-        .code(statusCodes.seeOther)
-    }
     await saveDraft(request, request.payload.transportMethod, draft)
     return h
-      .redirect('/notification/consignment-arrival-details')
+      .redirect('/notification/consignment-details')
       .code(statusCodes.seeOther)
   }
 }
