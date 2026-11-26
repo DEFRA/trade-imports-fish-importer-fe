@@ -3,10 +3,12 @@ import inert from '@hapi/inert'
 import { home } from '../routes/home/index.js'
 import { about } from '../routes/about/index.js'
 import { guidance } from '../routes/notification/guidance/index.js'
+import { testUserAuth } from '../routes/auth/index.js'
 import { health } from '../routes/health/index.js'
 import { cookies } from '../routes/cookies/controller.js'
 import { serveStaticFiles } from './serve-static-files.js'
 import { config } from '#/config/config.js'
+import { transportDetails } from '../routes/notification/transport-details/index.js'
 
 export const router = {
   plugin: {
@@ -19,7 +21,11 @@ export const router = {
       await server.register([cookies])
 
       // Application specific routes, add your own routes here
-      await server.register([home, about, guidance])
+      await server.register([home, about, guidance, transportDetails])
+
+      if (config.get('auth.testUserSignInEnabled')) {
+        await server.register(testUserAuth)
+      }
 
       // Static assets
       if (!config.get('isProduction') && !config.get('isTest')) {
@@ -29,6 +35,12 @@ export const router = {
             server: { middlewareMode: true },
             appType: 'custom'
           })
+
+          // Keep assets public so the sign-in page can load CSS and JavaScript.
+          // Use Hapi rules because @defra/hapi-connect has no authentication option.
+          server.rules((_rules, { path }) =>
+            path === '/public/{param*}' ? { auth: false } : undefined
+          )
 
           await server.register({
             plugin: (await import('@defra/hapi-connect')).default,

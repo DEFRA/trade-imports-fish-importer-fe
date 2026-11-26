@@ -1,4 +1,6 @@
-import { guidanceController } from './controller.js'
+import Joi from 'joi'
+
+import { guidanceController, startGuidanceController } from './controller.js'
 
 export const guidance = {
   plugin: {
@@ -9,6 +11,18 @@ export const guidance = {
           method: 'GET',
           path: '/notification/guidance',
           ...guidanceController
+        },
+        {
+          method: 'POST',
+          path: '/notification/guidance',
+          options: {
+            validate: {
+              payload: Joi.object({
+                journeyId: Joi.string().uuid().required()
+              })
+            }
+          },
+          ...startGuidanceController
         }
       ])
     }

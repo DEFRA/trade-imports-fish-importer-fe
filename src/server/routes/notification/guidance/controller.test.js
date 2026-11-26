@@ -5,6 +5,14 @@ import { config } from '#/config/config.js'
 
 describe('#guidanceController', () => {
   let server
+  const auth = {
+    strategy: 'session',
+    credentials: {
+      userId: 'test-user-importer-north-quay',
+      role: 'importer',
+      organisationId: 'test-org-north-quay-seafood'
+    }
+  }
 
   beforeAll(async () => {
     server = await createServer()
@@ -18,7 +26,8 @@ describe('#guidanceController', () => {
   test('Should provide expected response and guidance content', async () => {
     const { result, statusCode } = await server.inject({
       method: 'GET',
-      url: '/notification/guidance'
+      url: '/notification/guidance',
+      auth
     })
     const $ = cheerio.load(result)
     const content = $('main').text().replace(/\s+/g, ' ').trim()
@@ -60,7 +69,8 @@ describe('#guidanceController', () => {
   test('Should provide expandable document guidance', async () => {
     const { result } = await server.inject({
       method: 'GET',
-      url: '/notification/guidance'
+      url: '/notification/guidance',
+      auth
     })
     const $ = cheerio.load(result)
     const details = $('main details.govuk-details')
@@ -95,7 +105,8 @@ describe('#guidanceController', () => {
   test('Should provide a back link and related content', async () => {
     const { result } = await server.inject({
       method: 'GET',
-      url: '/notification/guidance'
+      url: '/notification/guidance',
+      auth
     })
     const $ = cheerio.load(result)
     const backLink = $('a.govuk-back-link')
@@ -118,21 +129,28 @@ describe('#guidanceController', () => {
     ])
   })
 
-  test('Should link Start now directly to transport details without creating a session', async () => {
+  test('Should offer a protected Start now action without creating a backend draft', async () => {
     const { result, headers } = await server.inject({
       method: 'GET',
-      url: '/notification/guidance'
+      url: '/notification/guidance',
+      auth
     })
     const $ = cheerio.load(result)
-    const startButton = $('main a.govuk-button--start')
+    const startForm = $('main form')
+    const startButton = startForm.find('button.govuk-button--start')
 
     expect(startButton).toHaveLength(1)
     expect(startButton.text().trim()).toBe('Start now')
-    expect(startButton.attr('href')).toBe('/notification/transport-details')
+    expect(startForm.attr('method')).toBe('post')
+    expect(startForm.attr('action')).toBe('/notification/guidance')
+    expect(startForm.find('input[name="crumb"]').val()).toBeTruthy()
+    expect(startForm.find('input[name="journeyId"]').val()).toMatch(
+      /^[a-f0-9-]{36}$/
+    )
     expect(
       (headers['set-cookie'] ?? []).some((cookie) =>
         cookie.startsWith(`${config.get('session.cache.name')}=`)
       )
-    ).toBe(false)
+    ).toBe(true)
   })
 })

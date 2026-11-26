@@ -16,8 +16,12 @@ import { contentSecurityPolicy } from './plugins/content-security-policy.js'
 import { metrics } from '@defra/cdp-metrics'
 import { cookieConsent } from '#/server/plugins/cookie-consent.js'
 import { csrf } from '#/server/plugins/csrf.js'
+import { authentication } from '#/server/plugins/authentication.js'
+import { createJourneyStore } from './services/notifications/journey-store.js'
 
 export async function createServer() {
+  const cacheType = config.get('session.cache.engine')
+  const cacheEngine = getCacheEngine(cacheType)
   const server = hapi.server({
     host: config.get('host'),
     port: config.get('port'),
@@ -47,7 +51,7 @@ export async function createServer() {
     cache: [
       {
         name: config.get('session.cache.name'),
-        engine: getCacheEngine(config.get('session.cache.engine'))
+        engine: cacheEngine
       }
     ],
     state: {
@@ -62,12 +66,24 @@ export async function createServer() {
     pulse,
     contentSecurityPolicy,
     sessionCache,
+    authentication,
     nunjucksConfig,
     Scooter,
     csrf,
     cookieConsent,
     router // Register all the controllers/routes defined in src/server/router.js
   ])
+
+  server.app.savedNotificationDrafts = server.cache({
+    cache: config.get('session.cache.name'),
+    segment: 'saved-notification-drafts',
+    expiresIn: config.get('session.cache.ttl')
+  })
+  server.app.notificationJourneyStore = createJourneyStore(
+    config.get('session.cache.ttl'),
+    // Catbox attaches the Redis client when Hapi initializes its caches.
+    cacheType === 'redis' ? () => cacheEngine.client : undefined
+  )
 
   server.ext('onPreResponse', catchAll)
 
