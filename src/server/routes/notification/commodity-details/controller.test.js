@@ -25,10 +25,32 @@ const commodities = [
       {
         speciesCode: 'SAL',
         commonName: 'Atlantic salmon',
+        scientificName: 'Salmo salar',
         netWeightKg: 500
       }
     ],
     totalNetWeightKg: 500
+  }
+]
+
+const referenceData = [
+  {
+    code: '03021400',
+    name: 'Fresh salmon',
+    species: [
+      {
+        faoCode: 'SAL',
+        commonName: 'Atlantic salmon',
+        scientificName: 'Salmo salar'
+      }
+    ]
+  },
+  {
+    code: '03025100',
+    name: 'Fresh cod',
+    species: [
+      { faoCode: 'COD', commonName: 'Atlantic cod', scientificName: null }
+    ]
   }
 ]
 
@@ -39,6 +61,7 @@ describe('commodity details controllers', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    getCommodities.mockResolvedValue(referenceData)
     request = {
       headers: { accept: 'application/json' },
       logger: { error: vi.fn() },
@@ -56,8 +79,6 @@ describe('commodity details controllers', () => {
   })
 
   test('renders reference data and saved commodities', async () => {
-    const reference = [{ code: '03021400', name: 'Fresh salmon' }]
-    getCommodities.mockResolvedValue(reference)
     loadDraft.mockResolvedValue({ commodities })
 
     await getCommodityDetailsController.handler(request, h)
@@ -66,7 +87,7 @@ describe('commodity details controllers', () => {
       'notification/commodity-details/index',
       {
         pageTitle: 'Tell us about the seafood you are importing',
-        referenceData: JSON.stringify(reference),
+        referenceData: JSON.stringify(referenceData),
         savedCommodities: JSON.stringify(commodities)
       }
     )
@@ -90,10 +111,51 @@ describe('commodity details controllers', () => {
     expect(response.code).toHaveBeenCalledWith(503)
   })
 
-  test('saves valid commodities and returns success', async () => {
+  test('saves canonical codes and labels with the submitted weights', async () => {
+    request.payload.commodities = JSON.stringify([
+      {
+        commodityCode: ' 03021400 ',
+        description: 'Submitted salmon description',
+        species: [
+          {
+            speciesCode: ' sal ',
+            commonName: 'Submitted salmon name',
+            scientificName: 'Submitted scientific name',
+            netWeightKg: 500
+          }
+        ],
+        totalNetWeightKg: 500
+      },
+      {
+        commodityCode: '03025100',
+        species: [
+          {
+            speciesCode: 'COD',
+            commonName: 'Submitted cod name',
+            scientificName: 'Submitted scientific name',
+            netWeightKg: 300
+          }
+        ],
+        totalNetWeightKg: 300
+      }
+    ])
+
     await postCommodityDetailsController.handler(request, h)
 
-    expect(saveCommodities).toHaveBeenCalledWith(request, commodities)
+    expect(getCommodities).toHaveBeenCalledWith(request.logger)
+    expect(saveCommodities).toHaveBeenCalledOnce()
+    expect(saveCommodities.mock.calls[0][0]).toBe(request)
+    expect(saveCommodities.mock.calls[0][1]).toStrictEqual([
+      ...commodities,
+      {
+        commodityCode: '03025100',
+        description: 'Fresh cod',
+        species: [
+          { speciesCode: 'COD', commonName: 'Atlantic cod', netWeightKg: 300 }
+        ],
+        totalNetWeightKg: 300
+      }
+    ])
     expect(h.response).toHaveBeenCalledWith({ success: true })
     expect(response.type).toHaveBeenCalledWith('application/json')
     expect(response.code).toHaveBeenCalledWith(200)
@@ -114,6 +176,63 @@ describe('commodity details controllers', () => {
       message: 'Check the commodity details and try again.'
     })
     expect(response.code).toHaveBeenCalledWith(400)
+  })
+
+  test('rejects duplicate species codes regardless of casing or whitespace', async () => {
+    const [commodity] = commodities
+    const [species] = commodity.species
+    request.payload.commodities = JSON.stringify([
+      {
+        ...commodity,
+        species: [species, { ...species, speciesCode: ' sal ' }],
+        totalNetWeightKg: species.netWeightKg * 2
+      }
+    ])
+
+    await postCommodityDetailsController.handler(request, h)
+
+    expect(response.code).toHaveBeenCalledWith(400)
+    expect(saveCommodities).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    ['an unknown commodity', '00000000', 'SAL'],
+    ['an unknown species', '03021400', 'ZZZ'],
+    ['a species listed under a different commodity', '03021400', 'COD']
+  ])(
+    'rejects %s without saving',
+    async (_label, commodityCode, speciesCode) => {
+      const [commodity] = commodities
+      request.payload.commodities = JSON.stringify([
+        {
+          ...commodity,
+          commodityCode,
+          species: [{ ...commodity.species[0], speciesCode }]
+        }
+      ])
+
+      await postCommodityDetailsController.handler(request, h)
+
+      expect(saveCommodities).not.toHaveBeenCalled()
+      expect(h.response).toHaveBeenCalledWith({
+        message: 'Check the commodity details and try again.'
+      })
+      expect(response.code).toHaveBeenCalledWith(400)
+    }
+  )
+
+  test('does not save when reference data is unavailable', async () => {
+    const error = new Error('Reference data unavailable')
+    getCommodities.mockRejectedValue(error)
+
+    await postCommodityDetailsController.handler(request, h)
+
+    expect(saveCommodities).not.toHaveBeenCalled()
+    expect(request.logger.error).toHaveBeenCalledWith(
+      { err: error },
+      'Failed to save commodities'
+    )
+    expect(response.code).toHaveBeenCalledWith(500)
   })
 
   test('returns a conflict message when the save conflicts', async () => {

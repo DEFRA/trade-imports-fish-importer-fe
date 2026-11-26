@@ -15,8 +15,8 @@ The [router plugin](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob
 | GET    | `/notification/consignment-details` | Renders saved arrival, country of export and CHED details, with a Back link to transport details.                                                           |
 | POST   | `/notification/consignment-details` | Validates and PATCHes arrival and export details to the saved draft, then redirects (303) to `/notification/commodity-details`.                             |
 | GET    | `/notification/next-step`           | Renders a temporary placeholder page with a Back link to consignment details.                                                                               |
-| GET    | `/notification/commodity-details`   | Loads commodity reference data and saved commodity rows.                                                                                                    |
-| POST   | `/notification/commodity-details`   | Validates and saves committed commodities, returning JSON with HTTP 200 on success or an error message on failure.                                          |
+| GET    | `/notification/commodity-details`   | Renders the [commodity details form](notification-journey.md#loading-the-form), or redirects to transport details when the draft lookup returns no draft.   |
+| POST   | `/notification/commodity-details`   | [Validates selections against reference data and saves them](notification-journey.md#validating-and-saving-selections), returning JSON.                     |
 
 Application routes require the `session` authentication strategy by default. `/health`, `/cookies` (GET and POST) and the static asset routes set `auth: false`, so they are public. Unauthenticated GET requests are redirected to `/auth/sign-in` when test user sign-in is enabled; other requests receive HTTP 401. See [Security](security.md).
 

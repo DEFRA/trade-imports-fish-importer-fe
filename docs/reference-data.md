@@ -1,6 +1,6 @@
 # Reference data
 
-The service loads commodity reference data at request time for the [commodity details page](notification-journey.md#commodity-details-page) form. It tries the configured external API first and caches the validated result in memory across requests.
+The service loads reference data at request time to populate the [commodity details form](notification-journey.md#loading-the-form) and to [validate and resolve submitted selections](notification-journey.md#validating-and-saving-selections). It tries the configured external API first and caches the validated result in memory across requests.
 
 ## Configuration
 
@@ -19,7 +19,7 @@ If either is empty, the loader treats it as an API failure and applies the fallb
 
 **When `ENVIRONMENT` is explicitly set to `local`, `dev`, `test`, `perf-test`, or `ext-test`**, the service logs a warning and falls back to seeded data from [`commodities.json`](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/services/reference-data/commodities.json) if the API load fails or returns invalid data. If the seeded data cannot be read or validated, the error is thrown.
 
-**In all other supported environments, including `prod`, or when `ENVIRONMENT` is unset**, the service throws the original load error and the commodity details route returns HTTP 503.
+**In all other supported environments, including `prod`, or when `ENVIRONMENT` is unset**, the service throws the original load error. See the [commodity details page](notification-journey.md#commodity-details-page) for how GET and POST handle unavailable data.
 
 The fallback does not depend on `NODE_ENV` or use the shared `local` default. The local development scripts explicitly set `ENVIRONMENT=local`. An unknown value such as `staging` is rejected at startup; see [Configuration](configuration.md).
 

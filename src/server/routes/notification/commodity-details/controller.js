@@ -25,6 +25,16 @@ const commodityListSchema = Joi.array()
   )
   .min(1)
 
+function normalizeCode(code) {
+  return code.trim().toLowerCase()
+}
+
+function invalidCommodityDetails(message = 'Invalid commodity details') {
+  return Object.assign(new Error(message), {
+    statusCode: statusCodes.badRequest
+  })
+}
+
 function submittedCommodities(payload) {
   try {
     const parsed =
@@ -37,7 +47,7 @@ function submittedCommodities(payload) {
     }
     const commodityCodes = new Set()
     for (const commodity of value) {
-      const code = commodity.commodityCode.trim().toLowerCase()
+      const code = normalizeCode(commodity.commodityCode)
       if (commodityCodes.has(code)) {
         throw new Error('Duplicate commodity code')
       }
@@ -46,7 +56,7 @@ function submittedCommodities(payload) {
       const speciesCodes = new Set()
       let total = 0
       for (const species of commodity.species) {
-        const speciesCode = species.speciesCode.trim().toLowerCase()
+        const speciesCode = normalizeCode(species.speciesCode)
         if (speciesCodes.has(speciesCode)) {
           throw new Error('Duplicate species code')
         }
@@ -59,10 +69,44 @@ function submittedCommodities(payload) {
     }
     return value
   } catch {
-    const error = new Error('Invalid commodity details')
-    error.statusCode = statusCodes.badRequest
-    throw error
+    throw invalidCommodityDetails()
   }
+}
+
+function resolveCommoditySelections(commodities, referenceData) {
+  return commodities.map((commodity) => {
+    const code = normalizeCode(commodity.commodityCode)
+    const reference = referenceData.find(
+      (entry) => normalizeCode(entry.code) === code
+    )
+    if (!reference) {
+      throw invalidCommodityDetails('Unknown commodity code')
+    }
+
+    return {
+      commodityCode: reference.code,
+      description: reference.name,
+      totalNetWeightKg: commodity.totalNetWeightKg,
+      species: commodity.species.map((species) => {
+        const speciesCode = normalizeCode(species.speciesCode)
+        const match = reference.species.find(
+          (entry) => normalizeCode(entry.faoCode) === speciesCode
+        )
+        if (!match) {
+          throw invalidCommodityDetails('Species is not listed for commodity')
+        }
+
+        return {
+          speciesCode: match.faoCode,
+          commonName: match.commonName,
+          ...(match.scientificName
+            ? { scientificName: match.scientificName }
+            : {}),
+          netWeightKg: species.netWeightKg
+        }
+      })
+    }
+  })
 }
 
 function saveErrorMessage(statusCode, error) {
@@ -108,7 +152,9 @@ export const getCommodityDetailsController = {
 export const postCommodityDetailsController = {
   async handler(request, h) {
     try {
-      const commodities = submittedCommodities(request.payload)
+      const submitted = submittedCommodities(request.payload)
+      const referenceData = await getCommodities(request.logger)
+      const commodities = resolveCommoditySelections(submitted, referenceData)
       await saveCommodities(request, commodities)
       return h
         .response({ success: true })
