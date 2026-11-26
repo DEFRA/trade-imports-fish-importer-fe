@@ -165,7 +165,7 @@ Successful responses include the following required envelope. The optional `arri
 
 ### Validating and saving selections
 
-The [commodity details script](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/client/javascripts/commodity-details.js) sends the committed rows grouped by commodity as a JSON list in the `commodities` form field. `POST /notification/commodity-details` validates the list on the server:
+The [commodity details script](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/client/javascripts/commodity-details.js) sends the committed rows grouped by commodity as a JSON list in the `commodities` form field. The [POST controller](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/routes/notification/commodity-details/controller.js) checks the structure, duplicate codes and weights before loading reference data to check membership:
 
 - The list must contain at least one commodity. Each commodity requires a `commodityCode`, a `totalNetWeightKg` and at least one species; `description` is optional.
 - Each species requires a `speciesCode`, a `commonName` and a `netWeightKg`; `scientificName` is optional.
