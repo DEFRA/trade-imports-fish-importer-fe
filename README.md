@@ -75,22 +75,10 @@ route is not yet registered and returns 404 until the commodity details page is
 integrated. It does not create a new draft notification. Revisiting consignment
 details pre-fills the saved arrival, country of export and CHED reference.
 
-The additional details section asks for the country of export. Countries are
-temporary seeded data in
-[countries.json](src/server/routes/notification/consignment-details/countries.json)
-until MDM provides them. The two territories without two-letter codes are
-temporarily unavailable. The prototype treats all countries outside the EU-27
-as rest of the world; the SPS exemption is deferred until MDM. A CHED reference
-is required for rest-of-the-world countries. It is trimmed,
-uppercased and checked against the fixed `CHEDP.GB.YYYY.NNNNNNN` format in
-[ched-reference.js](src/server/routes/notification/consignment-details/ched-reference.js),
-which also holds the provisional error text. CHED references are ignored for
-EU-27 countries. The CHED field is always rendered and
-[a client script](src/client/javascripts/ched-reference.js) hides it unless a
-rest-of-the-world country is selected. If an EU country is selected, the
-script clears the reference and its errors. Without JavaScript the field stays
-visible and the server decides whether it is needed. The CHED reference is not
-checked against any other service.
+The additional details section asks for the country of export and, for
+countries outside the EU-27, a CHED reference. See the
+[notification journey documentation](docs/notification-journey.md) for the
+country data, CHED validation and JavaScript behaviour.
 
 ## Server-side Caching
 
