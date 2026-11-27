@@ -4,10 +4,20 @@ import { ports } from './ports.js'
 import { ukDate } from './uk-date.js'
 import { validateConsignmentDetails } from './validation.js'
 
+// GOV.UK date examples use an unambiguous day and a single-digit month.
+const minExampleDay = 13
+const maxExampleMonth = 9
+
 function arrivalDateExample(now = new Date()) {
   const example = ukDate(now)
   example.setUTCDate(example.getUTCDate() + 2)
-  return `${example.getUTCDate()} ${example.getUTCMonth() + 1} ${example.getUTCFullYear()}`
+  const month = example.getUTCMonth() + 1
+  const year = example.getUTCFullYear()
+
+  if (month > maxExampleMonth) {
+    return `${minExampleDay} 1 ${year + 1}`
+  }
+  return `${Math.max(minExampleDay, example.getUTCDate())} ${month} ${year}`
 }
 
 function pageModel({ values = {}, errors = {}, journeyId } = {}) {

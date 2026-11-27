@@ -158,24 +158,35 @@ describe('Consignment details journey', () => {
   }
 
   test.each([
-    ['2026-11-24T10:00:00Z', '26 11 2026'],
-    ['2026-11-29T12:00:00Z', '1 12 2026'],
-    ['2026-12-31T23:30:00Z', '2 1 2027'],
+    ['2027-06-18T10:00:00Z', '20 6 2027'],
+    ['2026-07-31T23:30:00Z', '13 8 2026'],
+    ['2026-09-28T12:00:00Z', '30 9 2026'],
+    ['2026-09-28T23:30:00Z', '13 1 2027'],
+    ['2026-11-27T12:00:00Z', '13 1 2027'],
+    ['2026-12-31T23:30:00Z', '13 1 2027'],
     ['2028-02-27T12:00:00Z', '29 2 2028'],
-    ['2026-07-31T23:30:00Z', '3 8 2026'],
-    ['2026-03-28T23:30:00Z', '30 3 2026'],
-    ['2026-10-24T23:30:00Z', '27 10 2026']
+    ['2026-03-28T23:30:00Z', '30 3 2026']
   ])(
-    'shows a UK calendar-date example two days after %s',
+    'shows the first unambiguous, valid example at least two UK calendar days after %s',
     async (clock, example) => {
       vi.setSystemTime(new Date(clock))
-      const response = await visitArrival(await startDraft())
+      const jar = await startDraft()
+      const response = await visitArrival(jar)
       const $ = cheerio.load(response.payload)
 
       expect(response.statusCode).toBe(200)
       expect($('#arrival-date-hint').text().trim()).toBe(
         `For example, ${example}`
       )
+
+      const [day, month, year] = example.split(' ')
+      const saved = await submitArrivalForm(jar, $, {
+        'arrival-day': day,
+        'arrival-month': month,
+        'arrival-year': year
+      })
+      expect(saved.statusCode).toBe(303)
+      expect(notificationsClient.update).toHaveBeenCalledOnce()
     }
   )
 
@@ -199,9 +210,7 @@ describe('Consignment details journey', () => {
     expect($('main').text()).toContain(
       'Provide your port of entry and expected date of arrival.'
     )
-    expect($('#arrival-date-hint').text().trim()).toBe(
-      'For example, 21 11 2026'
-    )
+    expect($('#arrival-date-hint').text().trim()).toBe('For example, 13 1 2027')
     expect($('#arrival-time-hint').text()).toBe('For example, 09:30 or 14:30')
     expect($('a.govuk-back-link').attr('href')).toBe(
       '/notification/transport-details'
@@ -613,15 +622,15 @@ describe('Consignment details journey', () => {
 
   test('preserves values and highlights only a missing date component', async () => {
     const fields = { 'arrival-day': ' 20 ', 'arrival-month': '' }
-    vi.setSystemTime(new Date('2026-11-19T23:59:30Z'))
+    vi.setSystemTime(new Date('2026-09-28T22:59:30Z'))
     const jar = await startDraft()
     const initialResponse = await visitArrival(jar)
     const initialPage = cheerio.load(initialResponse.payload)
     expect(initialPage('#arrival-date-hint').text().trim()).toBe(
-      'For example, 21 11 2026'
+      'For example, 30 9 2026'
     )
 
-    vi.setSystemTime(new Date('2026-11-20T00:00:30Z'))
+    vi.setSystemTime(new Date('2026-09-28T23:00:30Z'))
     const response = await server.inject({
       method: 'POST',
       url,
@@ -637,9 +646,7 @@ describe('Consignment details journey', () => {
     const $ = cheerio.load(response.payload)
 
     expect(response.statusCode).toBe(400)
-    expect($('#arrival-date-hint').text().trim()).toBe(
-      'For example, 22 11 2026'
-    )
+    expect($('#arrival-date-hint').text().trim()).toBe('For example, 13 1 2027')
     expect($('#port').val()).toBe('DOVER')
     for (const [field, value] of Object.entries({
       ...validPayload,
