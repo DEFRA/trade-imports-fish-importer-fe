@@ -4,7 +4,7 @@ import {
 } from './controller.js'
 import { transportDetailsModel, transportDetailsSchema } from './model.js'
 import { statusCodes } from '#/server/common/constants/status-codes.js'
-import { currentDraft } from '#/server/services/notifications/draft-session.js'
+import { notificationJourneyGuard } from '../guard.js'
 
 const path = '/notification/transport-details'
 
@@ -16,24 +16,29 @@ export const transportDetails = {
         {
           method: 'GET',
           path,
+          options: {
+            ext: { onPostAuth: notificationJourneyGuard() }
+          },
           ...getTransportDetailsController
         },
         {
           method: 'POST',
           path,
           options: {
+            ext: {
+              onPostAuth: notificationJourneyGuard({
+                validateWithoutDraft: true
+              })
+            },
             validate: {
               payload: transportDetailsSchema,
-              async failAction(request, h) {
-                const draft = await currentDraft(request)
+              failAction(request, h) {
+                const draft = request.app.notificationDraft
                 if (!draft) {
                   return h
                     .redirect('/notification/guidance')
                     .code(statusCodes.seeOther)
                     .takeover()
-                }
-                if (draft.id !== request.payload?.journeyId) {
-                  return h.redirect(path).code(statusCodes.seeOther).takeover()
                 }
                 return h
                   .view(
@@ -41,7 +46,7 @@ export const transportDetails = {
                     transportDetailsModel(
                       request.payload?.transportMethod,
                       true,
-                      draft?.id
+                      draft.id
                     )
                   )
                   .code(statusCodes.badRequest)

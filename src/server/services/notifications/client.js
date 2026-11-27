@@ -2,7 +2,7 @@ import Joi from 'joi'
 
 import { config } from '#/config/config.js'
 import { statusCodes } from '#/server/common/constants/status-codes.js'
-import { transportMethods } from '#/server/common/constants/transport-methods.js'
+import { transportModes } from '#/server/common/constants/transport-methods.js'
 
 const notificationSchema = Joi.object({
   id: Joi.string().uuid().required(),
@@ -11,8 +11,28 @@ const notificationSchema = Joi.object({
     .required(),
   status: Joi.string().valid('DRAFT').required(),
   organisationId: Joi.string().required(),
-  transportMethod: Joi.string()
-    .valid(...transportMethods.map(({ value }) => value))
+  notification: Joi.object({
+    transport: Joi.object({
+      mode: Joi.string()
+        .valid(...transportModes)
+        .required()
+    })
+      .unknown(true)
+      .required(),
+    arrival: Joi.object({
+      portOfEntry: Joi.string()
+        .pattern(/^[A-Z0-9-]+$/)
+        .required(),
+      expectedArrivalDate: Joi.string()
+        .pattern(/^\d{4}-\d{2}-\d{2}$/)
+        .required(),
+      expectedArrivalTime: Joi.string()
+        .pattern(/^([01]\d|2[0-3]):[0-5]\d$/)
+        .required(),
+      expectedArrivalAt: Joi.string().isoDate().strict().required()
+    }).unknown(true)
+  })
+    .unknown(true)
     .required(),
   createdAt: Joi.string().isoDate().strict().required(),
   updatedAt: Joi.string().isoDate().strict().required()
@@ -46,14 +66,22 @@ function verifyNotification(notification, id, payload) {
   if (notification.id !== id) {
     throw new Error('Notification API returned a different draft identity')
   }
-  if (
-    payload &&
-    (notification.organisationId !== payload.organisationId ||
-      notification.transportMethod !== payload.transportMethod)
-  ) {
-    throw new Error(
-      'Notification API response does not match the saved details'
+  if (payload) {
+    const detailsDiffer = Object.entries(payload.notification).some(
+      ([section, fields]) =>
+        Object.entries(fields).some(
+          ([field, value]) =>
+            notification.notification[section]?.[field] !== value
+        )
     )
+    if (
+      notification.organisationId !== payload.organisationId ||
+      detailsDiffer
+    ) {
+      throw new Error(
+        'Notification API response does not match the saved details'
+      )
+    }
   }
 }
 
@@ -96,6 +124,6 @@ export const notificationsClient = {
     return send(request, id, 'POST', payload)
   },
   update(request, id, payload) {
-    return send(request, id, 'PUT', payload)
+    return send(request, id, 'PATCH', payload)
   }
 }

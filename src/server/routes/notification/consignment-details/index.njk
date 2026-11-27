@@ -1,0 +1,121 @@
+{% extends 'layouts/page.njk' %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/date-input/macro.njk" import govukDateInput %}
+{% from "govuk/components/error-message/macro.njk" import govukErrorMessage %}
+{% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
+{% from "govuk/components/fieldset/macro.njk" import govukFieldset %}
+{% from "govuk/components/input/macro.njk" import govukInput %}
+{% from "govuk/components/select/macro.njk" import govukSelect %}
+
+{% block beforeContent %}
+  {{ govukBackLink({
+    text: "Back",
+    href: "/notification/transport-details"
+  }) }}
+{% endblock %}
+
+{% block content %}
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+      {% if errorList.length %}
+        {{ govukErrorSummary({
+          titleText: "There is a problem",
+          errorList: errorList
+        }) }}
+      {% endif %}
+
+      <span class="govuk-caption-l">Import notification</span>
+      <h1 class="govuk-heading-l">Consignment details</h1>
+      <p class="govuk-body">Provide your port of entry and expected date of arrival.</p>
+      <h2 class="govuk-heading-m">Arrival details</h2>
+
+      <form method="post" action="/notification/consignment-details" novalidate>
+        <input type="hidden" name="crumb" value="{{ crumb }}">
+        <input type="hidden" name="journeyId" value="{{ journeyId }}">
+
+        {{ govukSelect({
+          id: "port",
+          name: "port",
+          label: {
+            text: "What is the port of entry?",
+            classes: "govuk-label--s"
+          },
+          items: ports,
+          errorMessage: errors.port
+        }) }}
+
+        {{ govukDateInput({
+          id: "arrival-date",
+          namePrefix: "arrival",
+          fieldset: {
+            legend: {
+              text: "What is the expected date of arrival?",
+              classes: "govuk-fieldset__legend--s"
+            }
+          },
+          hint: { text: "For example, " + arrivalDateExample },
+          values: values,
+          day: {
+            id: "arrival-day",
+            error: errors.date and "arrival-day" in errors.date.fields
+          },
+          month: {
+            id: "arrival-month",
+            error: errors.date and "arrival-month" in errors.date.fields
+          },
+          year: {
+            id: "arrival-year",
+            error: errors.date and "arrival-year" in errors.date.fields
+          },
+          errorMessage: errors.date
+        }) }}
+
+        <div class="govuk-form-group{% if errors.time %} govuk-form-group--error{% endif %}">
+          {% call govukFieldset({
+            legend: {
+              text: "What time is the expected arrival?",
+              classes: "govuk-fieldset__legend--s"
+            },
+            describedBy: "arrival-time-hint arrival-time-error" if errors.time else "arrival-time-hint",
+            role: "group"
+          }) %}
+            <div class="govuk-hint" id="arrival-time-hint">For example, 09:30 or 14:30</div>
+            {% if errors.time %}
+              {{ govukErrorMessage({
+                id: "arrival-time-error",
+                text: errors.time.text
+              }) }}
+            {% endif %}
+
+            <div class="govuk-!-display-inline-block govuk-!-margin-right-4">
+              {{ govukInput({
+                id: "arrival-hour",
+                name: "arrival-hour",
+                label: { text: "Hour" },
+                classes: "govuk-input--width-2 govuk-input--error" if errors.time and "arrival-hour" in errors.time.fields else "govuk-input--width-2",
+                inputmode: "numeric",
+                value: values["arrival-hour"],
+                formGroup: { classes: "govuk-!-margin-bottom-0" }
+              }) }}
+            </div>
+            <div class="govuk-!-display-inline-block">
+              {{ govukInput({
+                id: "arrival-minute",
+                name: "arrival-minute",
+                label: { text: "Minute" },
+                classes: "govuk-input--width-2 govuk-input--error" if errors.time and "arrival-minute" in errors.time.fields else "govuk-input--width-2",
+                inputmode: "numeric",
+                value: values["arrival-minute"],
+                formGroup: { classes: "govuk-!-margin-bottom-0" }
+              }) }}
+            </div>
+          {% endcall %}
+        </div>
+
+        {{ govukButton({ text: "Save and continue" }) }}
+      </form>
+    </div>
+  </div>
+{% endblock %}

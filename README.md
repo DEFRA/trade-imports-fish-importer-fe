@@ -8,6 +8,7 @@ Core delivery platform Node.js Frontend Template.
 
 - [Requirements](#requirements)
   - [Node.js](#nodejs)
+- [Notification journey](#notification-journey)
 - [Server-side Caching](#server-side-caching)
 - [Redis](#redis)
 - [Local Development](#local-development)
@@ -42,6 +43,37 @@ To use the correct version of Node.js for this application, via nvm:
 cd trade-imports-fish-importer-fe
 nvm use
 ```
+
+## Notification journey
+
+The [guidance page](src/server/routes/notification/guidance/index.njk)
+**Start now** action submits a CSRF-protected POST to `/notification/guidance`,
+which creates a session draft and redirects to `/notification/transport-details`.
+Visiting transport details without an active draft redirects to guidance. Saving
+a selected transport mode persists the draft through the notification API before
+redirecting to `/notification/consignment-details`.
+The consignment form collects a port of entry and an expected arrival date and
+time. Its Back link returns to transport details with the saved transport mode
+selected; the transport page's Back link returns to guidance. Port options are
+temporary seeded data in [ports.json](src/server/routes/notification/consignment-details/ports.json),
+not a live port directory.
+
+Validation runs on the frontend server using the
+[GOV.UK date-input guidance](https://design-system.service.gov.uk/components/date-input/),
+including real dates, four-digit years and numeric, full or abbreviated English
+months. Hours are 0-23 and minutes are 0-59; both accept one or two digits.
+Expected arrival is interpreted in UK local time (`Europe/London`) and must be
+at least 2 elapsed hours and no more than 1 calendar year after the server time
+captured at submission. Both limits are inclusive; validation retains submission
+seconds and milliseconds when checking these bounds.
+
+Entered consignment values are redisplayed on validation errors. A successful
+consignment POST saves arrival details onto the existing draft notification
+through the notification API using PATCH, then redirects with 303 to
+`/notification/next-step`, an unregistered URL that returns the normal 404 page.
+It does not create a new draft notification. Revisiting consignment details
+pre-fills the saved port of entry and expected arrival date and time.
+Additional details, country of export and CHED fields are not implemented.
 
 ## Server-side Caching
 
