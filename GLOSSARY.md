@@ -22,3 +22,10 @@ _Avoid_: Destination port, entry point
 **Expected arrival**:
 The date and time the consignment is expected to arrive at the port of entry, as given in UK local time.
 _Avoid_: ETA, arrival time (when meaning the date as well)
+
+**Country of export**:
+The country the consignment is exported from.
+_Avoid_: Country of origin, origin country
+
+**CHED reference**:
+The reference of the Common Health Entry Document (CHED-P) issued for the consignment.

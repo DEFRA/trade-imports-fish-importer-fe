@@ -14,7 +14,7 @@ Pull requests to `main` run security audit, frontend build, formatting, lint, te
 
 ## Notification API release dependency
 
-The notification journey requires the matching backend release implementing nested canonical transport creation, transport and arrival PATCH, and GET in the [notification API contract](notification-journey.md#notification-api-client). There is no legacy API compatibility path. Include this dependency in the frontend PR description when creating a PR; release coordination is a separate team decision.
+The notification journey requires the matching backend release implementing nested canonical transport creation, transport, arrival and export-details PATCH, and GET in the [notification API contract](notification-journey.md#notification-api-client). There is no legacy API compatibility path. Include this dependency in the frontend PR description when creating a PR; release coordination is a separate team decision.
 
 ## Local Compose environment
 

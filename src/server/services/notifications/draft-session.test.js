@@ -2,7 +2,7 @@ import {
   currentDraft,
   loadDraft,
   loadSavedDraft,
-  saveArrival,
+  saveConsignmentDetails,
   saveDraft,
   startDraft
 } from './draft-session.js'
@@ -101,9 +101,9 @@ describe('notification draft session', () => {
 
     const notification = await loadSavedDraft(request)
     expect(notification).toBeNull()
-    await expect(saveArrival(request, {}, notification)).rejects.toThrow(
-      'No saved notification for arrival details'
-    )
+    await expect(
+      saveConsignmentDetails(request, {}, notification)
+    ).rejects.toThrow('No saved notification for consignment details')
     expect(await currentDraft(request)).toMatchObject({
       id: journeyId,
       saved: false
@@ -133,9 +133,9 @@ describe('notification draft session', () => {
     }
     notificationsClient.update.mockResolvedValue(response)
 
-    await expect(saveArrival(request, arrival, saved(id))).resolves.toEqual(
-      response
-    )
+    await expect(
+      saveConsignmentDetails(request, { arrival }, saved(id))
+    ).resolves.toEqual(response)
 
     expect(notificationsClient.update).toHaveBeenCalledExactlyOnceWith(
       request,
@@ -172,9 +172,9 @@ describe('notification draft session', () => {
       reference: 'GBN-FIS-26-OTHER'
     })
 
-    await expect(saveArrival(request, {}, notification)).rejects.toThrow(
-      'Draft reference has unexpectedly changed during save'
-    )
+    await expect(
+      saveConsignmentDetails(request, {}, notification)
+    ).rejects.toThrow('Draft reference has unexpectedly changed during save')
   })
 
   test('first save creates once and later saves update the same ID/reference', async () => {

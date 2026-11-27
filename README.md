@@ -68,12 +68,17 @@ captured at submission. Both limits are inclusive; validation retains submission
 seconds and milliseconds when checking these bounds.
 
 Entered consignment values are redisplayed on validation errors. A successful
-consignment POST saves arrival details onto the existing draft notification
-through the notification API using PATCH, then redirects with 303 to
-`/notification/next-step`, an unregistered URL that returns the normal 404 page.
-It does not create a new draft notification. Revisiting consignment details
-pre-fills the saved port of entry and expected arrival date and time.
-Additional details, country of export and CHED fields are not implemented.
+consignment POST saves the arrival, country of export and any required CHED
+reference onto the existing draft notification through the notification API
+using PATCH, then redirects with 303 to `/notification/commodity-details`. That
+route is not yet registered and returns 404 until the commodity details page is
+integrated. It does not create a new draft notification. Revisiting consignment
+details pre-fills the saved arrival, country of export and CHED reference.
+
+The additional details section asks for the country of export and, for
+countries outside the EU-27, a CHED reference. See the
+[notification journey documentation](docs/notification-journey.md) for the
+country data, CHED validation and JavaScript behaviour.
 
 ## Server-side Caching
 
