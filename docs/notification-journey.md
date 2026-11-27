@@ -1,8 +1,8 @@
 # Notification journey
 
-The [router plugin](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/plugins/router.js) registers the guidance, transport details, consignment details and next-step pages. Their code lives under [`src/server/routes/notification`](https://github.com/DEFRA/trade-imports-fish-importer-fe/tree/main/src/server/routes/notification).
+The [router plugin](https://github.com/DEFRA/trade-imports-fish-importer-fe/blob/main/src/server/plugins/router.js) registers the guidance, transport details, and consignment details pages. Their code lives under [`src/server/routes/notification`](https://github.com/DEFRA/trade-imports-fish-importer-fe/tree/main/src/server/routes/notification).
 
-The forward journey is guidance -> transport details -> consignment details, followed by a redirect to `/notification/commodity-details`. That route is not yet registered and returns 404 until the commodity details page is integrated. The temporary `/notification/next-step` placeholder remains available directly with a Back link to consignment details, but is no longer the onward destination. Back links on the implemented journey pages follow the reverse order, with guidance returning to the home page.
+The forward journey is guidance -> transport details -> consignment details, followed by a redirect to `/notification/commodity-details`. That route is not yet registered and returns 404 until the commodity details page is integrated. Back links on the implemented journey pages follow the reverse order, with guidance returning to the home page.
 
 ## Route guarding
 
@@ -15,7 +15,7 @@ Transport and consignment routes use the shared [notification journey guard](htt
 - Viewing guidance does not reset access. Starting a different notification replaces the active draft ID, so the previous notification's saved transport cannot unlock consignment for the new one.
 - Backend and cache failures propagate to the normal error response rather than being treated as an unfinished prerequisite.
 
-The guard controls access and stale-form rejection, not successful onward navigation. In particular, it does not change the existing consignment redirect to the unimplemented next-step page.
+The guard controls access and stale-form rejection, not successful onward navigation. In particular, it does not change the consignment redirect to the unimplemented commodity details page.
 
 ## Guidance page
 
@@ -53,7 +53,6 @@ The draft service saves the selected value as `notification.transport.mode`. Whe
 | ------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | GET    | `/notification/consignment-details` | After route guarding, pre-fills any saved arrival and export details using the notification loaded by the guard, and renders a Back link to transport details.                                                 |
 | POST   | `/notification/consignment-details` | After route guarding and draft-ID checks, validates arrival and export details, PATCHes a saved draft, redisplaying invalid values with HTTP 400 or redirecting with 303 to `/notification/commodity-details`. |
-| GET    | `/notification/next-step`           | Renders a temporary placeholder page with a Back link to consignment details.                                                                                                                                  |
 
 - Consignment submissions require a CSRF token and the active draft ID. Validation errors include a linked error summary, inline messages and an `Error:` page-title prefix.
 - The date hint shows "For example, D M YYYY". Starting two UK calendar days from today, it uses the first date with a day of 13 or more and a month from January to September, following [GOV.UK guidance on example dates](https://design-system.service.gov.uk/patterns/dates/#how-to-write-dates). This rule applies only to the example, not to the dates importers can enter. The server recalculates the hint on GET and validation-error redisplay without changing entered or saved values. An open page keeps its example until the next server render.

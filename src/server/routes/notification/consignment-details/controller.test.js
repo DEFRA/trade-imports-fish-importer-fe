@@ -313,6 +313,7 @@ describe('Consignment details journey', () => {
     expect(response.statusCode).toBe(303)
     expect(response.headers.location).toBe('/notification/guidance')
     expect(notificationsClient.create).not.toHaveBeenCalled()
+    expectNoSession(response)
   })
 
   test('redirects when the session draft has not been saved to the backend', async () => {
@@ -1024,6 +1025,23 @@ describe('Consignment details journey', () => {
         }
       }
     )
+
+    const destination = await server.inject({
+      method: 'GET',
+      url: response.headers.location,
+      auth
+    })
+    const $ = cheerio.load(destination.payload)
+
+    expect(destination.statusCode).toBe(404)
+    expect($('head > title').text().trim()).toBe(
+      `Page not found | ${config.get('serviceName')}`
+    )
+    expect($('header').length).toBeGreaterThan(0)
+    expect($('footer').length).toBeGreaterThan(0)
+    expect($('main h1')).toHaveLength(1)
+    expect($('main h1').text().trim()).toBe('404')
+    expect($('main').text()).toContain('Page not found')
 
     const back = cheerio.load((await visitArrival(jar)).payload)
 
